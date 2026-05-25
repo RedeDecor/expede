@@ -318,8 +318,8 @@ thead tr{border-bottom:1px solid #2A2A2E}
   <!-- sub: MAPA -->
   <div id="sub-mapa" class="sub-page active">
     <div class="card">
-      <div class="stitle">🔍 Localizar por Código de Barras</div>
-      <input type="text" id="barcodeQ" placeholder="Digite ou escaneie o código..." style="font-family:'Courier New',monospace;font-size:15px" oninput="searchBarcode(this.value)">
+      <div class="stitle">🔍 Localizar Produto — Código de Barras, SKU ou Nome</div>
+      <input type="text" id="barcodeQ" placeholder="Digite o código de barras, SKU ou nome do produto..." style="font-size:15px" oninput="searchBarcode(this.value)">
       <div id="barcodeResult"></div>
     </div>
     <div class="card">
@@ -1126,22 +1126,63 @@ function renderOrders(){
 
 // ── estoque ────────────────────────────────────────────────────────────────────
 function searchBarcode(val){
-  const el=document.getElementById("barcodeResult");
-  const p=products.find(x=>x.barcode===val.trim());
-  if(!val.trim()){el.innerHTML="";return;}
-  if(p){
-    el.innerHTML=`<div class="found-box">
-      <div style="color:#22C55E;font-weight:700;margin-bottom:8px">✅ ENCONTRADO</div>
-      <div class="found-grid">
-        <div><span style="color:#666">Nome:</span> ${p.name}</div>
-        <div><span style="color:#666">SKU:</span> ${p.sku}</div>
-        <div><span style="color:#666">Barcode:</span> <span class="mono">${p.barcode}</span></div>
-        <div><span style="color:#666">Localização:</span> <strong style="color:#E85D04;font-size:16px">${p.location||"Não definida"}</strong></div>
-        <div><span style="color:#666">Estoque:</span> <strong style="color:${p.qty>0?"#22C55E":"#EF4444"};font-size:16px">${p.qty} un.</strong></div>
-      </div>
+  const el = document.getElementById("barcodeResult");
+  const q  = val.trim();
+  if(!q){ el.innerHTML=""; return; }
+
+  // exact barcode match first
+  const exact = products.find(x=>x.barcode===q);
+  if(exact){
+    el.innerHTML = renderFoundProduct(exact);
+    return;
+  }
+
+  // search by SKU or name (partial, case-insensitive)
+  const matches = products.filter(x=>
+    norm(x.sku).includes(norm(q)) ||
+    norm(x.name).includes(norm(q))
+  ).slice(0,8);
+
+  if(matches.length === 1){
+    el.innerHTML = renderFoundProduct(matches[0]);
+  } else if(matches.length > 1){
+    el.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+      <div style="font-size:12px;color:#888;font-weight:600">${matches.length} produtos encontrados:</div>
+      ${matches.map(p=>`
+        <div onclick="selectFoundProduct('${p.id}')" style="background:#252528;border:1px solid #3A3A3E;border-radius:9px;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:12px" onmouseover="this.style.borderColor='#E85D04'" onmouseout="this.style.borderColor='#3A3A3E'">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:13px">${p.name}</div>
+            <div style="font-size:11px;color:#888">SKU: ${p.sku} · EAN: ${p.barcode||"—"}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="color:#E85D04;font-weight:700;font-family:'Courier New',monospace">${p.location||"Sem local"}</div>
+            <div style="color:${p.qty>0?"#22C55E":"#EF4444"};font-size:12px;font-weight:700">${p.qty} un.</div>
+          </div>
+        </div>`).join("")}
     </div>`;
   } else {
-    el.innerHTML=`<div class="not-found">❌ Código não encontrado no estoque.</div>`;
+    el.innerHTML=`<div class="not-found">❌ Nenhum produto encontrado para "<strong>${q}</strong>".</div>`;
+  }
+}
+
+function renderFoundProduct(p){
+  return `<div class="found-box">
+    <div style="color:#22C55E;font-weight:700;margin-bottom:8px">✅ ENCONTRADO</div>
+    <div class="found-grid">
+      <div><span style="color:#666">Nome:</span> ${p.name}</div>
+      <div><span style="color:#666">SKU:</span> ${p.sku||"—"}</div>
+      <div><span style="color:#666">Barcode:</span> <span class="mono">${p.barcode||"—"}</span></div>
+      <div><span style="color:#666">Localização:</span> <strong style="color:#E85D04;font-size:16px">${p.location||"Não definida"}</strong></div>
+      <div><span style="color:#666">Estoque:</span> <strong style="color:${p.qty>0?"#22C55E":"#EF4444"};font-size:16px">${p.qty} un.</strong></div>
+    </div>
+  </div>`;
+}
+
+function selectFoundProduct(id){
+  const p = products.find(x=>x.id===id);
+  if(p){
+    document.getElementById("barcodeResult").innerHTML = renderFoundProduct(p);
+    document.getElementById("barcodeQ").value = p.barcode||p.name;
   }
 }
 
