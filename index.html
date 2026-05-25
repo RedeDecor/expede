@@ -775,6 +775,49 @@ function fmt(d){return d?new Date(d+"T12:00:00").toLocaleDateString("pt-BR"):"�
 function uid(){return Math.random().toString(36).slice(2,9);}
 function norm(s){return (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
 
+// ── multi-location helpers ────────────────────────────────────────────────────
+function getLocations(p){
+  // returns [{location, qty}] array
+  if(p.locations && p.locations.length) return p.locations;
+  // backward compat: single location field
+  if(p.location) return [{location:p.location, qty:p.qty||0}];
+  return [{location:"", qty:p.qty||0}];
+}
+
+function getTotalQty(p){
+  return getLocations(p).reduce((s,l)=>s+l.qty,0);
+}
+
+function getLocationNames(p){
+  return getLocations(p).map(l=>l.location).filter(Boolean);
+}
+
+function addLocationQty(p, location, qty){
+  const locs = getLocations(p);
+  const idx = locs.findIndex(l=>l.location===location);
+  if(idx>=0){
+    locs[idx] = {...locs[idx], qty: locs[idx].qty + qty};
+  } else {
+    locs.push({location, qty});
+  }
+  return {...p, locations: locs, location: locs[0]?.location||"", qty: locs.reduce((s,l)=>s+l.qty,0)};
+}
+
+function deductLocationQty(p, location, qty){
+  const locs = getLocations(p);
+  const idx = locs.findIndex(l=>l.location===location);
+  if(idx>=0){
+    const newQty = Math.max(0, locs[idx].qty - qty);
+    locs[idx] = {...locs[idx], qty: newQty};
+  } else {
+    // deduct from first location with stock
+    const first = locs.findIndex(l=>l.qty>0);
+    if(first>=0) locs[first] = {...locs[first], qty: Math.max(0, locs[first].qty - qty)};
+  }
+  return {...p, locations: locs, location: locs[0]?.location||"", qty: locs.reduce((s,l)=>s+l.qty,0)};
+}
+
+
 // ── toast ──────────────────────────────────────────────────────────────────────
 let toastTimer;
 function showToast(msg,type="ok"){
@@ -987,7 +1030,9 @@ function finishPrepare(id, name, fromLocation){
   // deduct from the chosen location
   products = products.map(p=>{
     if(p.barcode===order.barcode){
-      if(fromLocation && p.location!==fromLocation) return p; // skip other locations
+      if(fromLocation){
+        return deductLocationQty(p, fromLocation, order.qty);
+      }
       return {...p, qty: Math.max(0, p.qty - order.qty)};
     }
     return p;
@@ -1166,14 +1211,23 @@ function searchBarcode(val){
 }
 
 function renderFoundProduct(p){
+  const locs = getLocations(p);
+  const total = getTotalQty(p);
+  const locHtml = locs.length > 1
+    ? locs.map(l=>`<div style="display:flex;justify-content:space-between;background:#252528;border-radius:6px;padding:5px 10px;margin-top:4px">
+        <span style="color:#E85D04;font-family:'Courier New',monospace;font-weight:700">${l.location||"Sem local"}</span>
+        <span style="color:${l.qty>0?"#22C55E":"#EF4444"};font-weight:700">${l.qty} un.</span>
+      </div>`).join("")
+    : `<strong style="color:#E85D04;font-size:16px">${locs[0]?.location||"Não definida"}</strong>`;
+
   return `<div class="found-box">
     <div style="color:#22C55E;font-weight:700;margin-bottom:8px">✅ ENCONTRADO</div>
     <div class="found-grid">
       <div><span style="color:#666">Nome:</span> ${p.name}</div>
       <div><span style="color:#666">SKU:</span> ${p.sku||"—"}</div>
       <div><span style="color:#666">Barcode:</span> <span class="mono">${p.barcode||"—"}</span></div>
-      <div><span style="color:#666">Localização:</span> <strong style="color:#E85D04;font-size:16px">${p.location||"Não definida"}</strong></div>
-      <div><span style="color:#666">Estoque:</span> <strong style="color:${p.qty>0?"#22C55E":"#EF4444"};font-size:16px">${p.qty} un.</strong></div>
+      <div style="grid-column:1/-1"><span style="color:#666">Localização(ões):</span> ${locHtml}</div>
+      <div><span style="color:#666">Estoque total:</span> <strong style="color:${total>0?"#22C55E":"#EF4444"};font-size:16px">${total} un.</strong></div>
     </div>
   </div>`;
 }
@@ -1460,15 +1514,20 @@ function cancelImport(){
 function confirmEntry(){
   if(!importedItems.length)return;
   const map=new Map(products.map(p=>[p.id,{...p}]));
-  let created=0, updated=0;
+  let created=0, updated=0, locPreserved=0;
   importedItems.forEach(item=>{
     const locVal=document.getElementById("loc_"+item.id)?.value.trim()||item.location||"";
     if(item.action==="update"&&item.matchedProduct){
-      // add qty to existing product
       const ex=map.get(item.matchedProduct.id);
-      if(ex){ map.set(ex.id,{...ex,qty:ex.qty+item.qty,location:locVal||ex.location}); updated++; }
+      if(ex){
+        // preserve all existing locations — just add qty to the right location
+        const finalLoc = locVal || ex.location || "";
+        const updated_p = addLocationQty(ex, finalLoc, item.qty);
+        map.set(ex.id, updated_p);
+        if(ex.location && ex.location!==locVal) locPreserved++;
+        updated++;
+      }
     } else {
-      // create new product
       const newId="p"+Date.now()+Math.random().toString(36).slice(2,5);
       map.set(newId,{id:newId,barcode:item.barcode||"",name:item.name,sku:item.sku,location:locVal,qty:item.qty});
       created++;
@@ -1479,7 +1538,8 @@ function confirmEntry(){
   const msg=[];
   if(updated) msg.push(`${updated} atualizado(s)`);
   if(created) msg.push(`${created} criado(s)`);
-  addLog("estoque", `Entrada de mercadoria confirmada`, `${updated} atualizado(s), ${created} criado(s)`);
+  if(locPreserved) msg.push(`${locPreserved} localização(ões) preservada(s)`);
+  addLog("estoque", `Entrada de mercadoria confirmada`, `${updated} atualizado(s), ${created} criado(s), ${locPreserved} localizações preservadas`);
   showToast(`✅ Estoque atualizado: ${msg.join(", ")}!`);
   importedItems=[];importSource=null;
   document.getElementById("importOptions").style.display="";
