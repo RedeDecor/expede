@@ -2228,7 +2228,8 @@ function mapScan(val){
     const oldLoc = prod.location;
     products = products.map(p => p.barcode === barcode ? {...p, location: region} : p);
     mapLog.unshift({barcode, name: prod.name, region, oldLoc, found: true, ts});
-    showToast(`📍 ${prod.name} → ${region}`);
+    if(typeof cloudSaveAll==="function") cloudSaveAll();
+  showToast(`📍 ${prod.name} → ${region}`);
   } else {
     mapLog.unshift({barcode, name: null, region, found: false, ts});
     showToast("⚠️ Código não encontrado no estoque.", "err");
@@ -2385,6 +2386,8 @@ function quickRegister(barcode){
   products.push({id:"p"+Date.now(),barcode,name,sku,location:loc,qty});
   // mark log entry as resolved
   mapLog = mapLog.map(e=>e.barcode===barcode&&!e.found ? {...e,found:true,name,region:loc,resolved:true} : e);
+  addLog("estoque", `Produto cadastrado via mapeamento: ${name}`, `EAN: ${barcode} · Local: ${loc}`);
+  if(typeof cloudSaveAll==="function") cloudSaveAll();
   showToast(`✅ ${name} cadastrado e mapeado em ${loc}!`);
   renderMapLog();
   renderMapSummary();
