@@ -226,7 +226,7 @@ thead tr{border-bottom:1px solid #2A2A2E}
     <div class="scan-row">
       <div class="scan-input-wrap">
         <div class="scan-label">ESCANEAR PARA PREPARAR</div>
-        <input type="text" id="scanInput" placeholder="Digite ou escaneie o código de barras..." style="font-family:'Courier New',monospace;font-size:15px" onkeydown="if(event.key==='Enter')scanForPrepare(this.value)">
+        <input type="text" id="scanInput" placeholder="Digite ou escaneie o código de barras..." style="font-family:'Courier New',monospace;font-size:15px" onkeydown="if(event.key==='Enter'){scanForPrepare(this.value);}" oninput="autoScanExpDebounce(this.value)">
       </div>
       <button class="btn btn-ghost" style="margin-top:20px" onclick="alert('Use um leitor USB/Bluetooth conectado ao tablet, ou digitar o código manualmente.')">📷 Câmera</button>
     </div>
@@ -423,7 +423,7 @@ thead tr{border-bottom:1px solid #2A2A2E}
         <div style="flex:1;min-width:200px">
           <div style="font-size:11px;color:#888;margin-bottom:6px;letter-spacing:1px;font-weight:600">BIPAR PRODUTO</div>
           <div style="display:flex;gap:8px">
-            <input type="text" id="mapScanInput" placeholder="Bipe ou digite o código..." style="font-size:15px;font-family:'Courier New',monospace;flex:1" onkeydown="if(event.key==='Enter')mapScan(this.value)" disabled>
+            <input type="text" id="mapScanInput" placeholder="Bipe ou digite o código..." style="font-size:15px;font-family:'Courier New',monospace;flex:1" onkeydown="if(event.key==='Enter'){mapScan(this.value);}" oninput="autoScanDebounce(this.value)" disabled>
             <button class="btn btn-ghost" id="mapManualBtn" style="white-space:nowrap;display:none" onclick="mapScan(document.getElementById('mapScanInput').value)">✅ Confirmar</button>
           </div>
         </div>
@@ -720,12 +720,13 @@ thead tr{border-bottom:1px solid #2A2A2E}
         loadFromCloud("activityLog"),
       ]);
 
-      if(cloudProducts)  products     = cloudProducts;
-      if(cloudOrders)    orders       = cloudOrders;
-      if(cloudRegions)   regions      = cloudRegions;
-      if(cloudUsers)     USERS        = cloudUsers;
-      if(cloudEntries)   entries      = cloudEntries;
-      if(cloudLog)       activityLog  = cloudLog;
+      // Only replace local data if cloud has data (never overwrite with empty)
+      if(cloudProducts && cloudProducts.length > 0)  products    = cloudProducts;
+      if(cloudOrders   && cloudOrders.length   > 0)  orders      = cloudOrders;
+      if(cloudRegions  && cloudRegions.length  > 0)  regions     = cloudRegions;
+      if(cloudUsers    && cloudUsers.length    > 0)  USERS       = cloudUsers;
+      if(cloudEntries  && cloudEntries.length  > 0)  entries     = cloudEntries;
+      if(cloudLog      && cloudLog.length      > 0)  activityLog = cloudLog;
 
       if(indicator){ indicator.textContent = "☁️ Sincronizado"; indicator.style.color="#22C55E"; }
       renderAll();
@@ -756,16 +757,9 @@ const STATUS = {
 };
 const MARKETPLACES = ["Mercado Livre","Amazon","Magalu","Madeira Madeira","Site Próprio","Loja Física","Outro"];
 
-let products = [
-  {id:"p1",barcode:"7891234560001",name:"Tapete Sala 2x3m Bege",sku:"TAP-001",location:"A1-P2",qty:12},
-  {id:"p2",barcode:"7891234560002",name:"Tapete Quarto 1x1.5m Cinza",sku:"TAP-002",location:"A1-P3",qty:7},
-  {id:"p3",barcode:"7891234560003",name:"Tapete Corredor 0.5x2m Azul",sku:"TAP-003",location:"B2-P1",qty:3},
-];
-let orders = [
-  {id:"o1",orderId:"ML-98765",marketplace:"Mercado Livre",barcode:"7891234560001",productName:"Tapete Sala 2x3m Bege",qty:1,saleDate:"2025-05-15",shippingDate:todayStr(),status:"aguardando_preparo",location:"A1-P2",preparedAt:null,preparedBy:""},
-  {id:"o2",orderId:"AMZ-12345",marketplace:"Amazon",barcode:"7891234560002",productName:"Tapete Quarto 1x1.5m Cinza",qty:1,saleDate:"2025-05-18",shippingDate:todayStr(),status:"preparado",location:"A1-P3",preparedAt:"2025-05-20T09:32:00",preparedBy:"João"},
-  {id:"o3",orderId:"ML-44321",marketplace:"Mercado Livre",barcode:"7891234560003",productName:"Tapete Corredor 0.5x2m Azul",qty:2,saleDate:"2025-05-19",shippingDate:todayStr(),status:"em_preparo",location:"B2-P1",preparedAt:null,preparedBy:""},
-];
+// Data loaded from Firebase — empty arrays as fallback
+let products = [];
+let orders   = [];
 let entries = [];
 let importedItems = [];
 let importSource = null;
@@ -1610,6 +1604,30 @@ document.addEventListener("click", e=>{
 });
 
 
+
+
+// ── auto-scan debounce (leitor USB sem Enter automático) ──────────────────────
+let mapScanTimer = null;
+function autoScanDebounce(val){
+  clearTimeout(mapScanTimer);
+  if(!val.trim()) return;
+  // EAN-13 = 13 digits, EAN-8 = 8 digits, Code128 varies
+  // If looks like a complete barcode (8+ digits/chars), fire after 120ms of no typing
+  mapScanTimer = setTimeout(()=>{
+    const input = document.getElementById("mapScanInput");
+    if(input && input.value.trim()) mapScan(input.value);
+  }, 120);
+}
+
+let expScanTimer = null;
+function autoScanExpDebounce(val){
+  clearTimeout(expScanTimer);
+  if(!val.trim()) return;
+  expScanTimer = setTimeout(()=>{
+    const input = document.getElementById("scanInput");
+    if(input && input.value.trim()) scanForPrepare(input.value);
+  }, 120);
+}
 
 // ── activity log ──────────────────────────────────────────────────────────────
 let activityLog = [];
