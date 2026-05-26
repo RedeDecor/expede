@@ -728,12 +728,16 @@ thead tr{border-bottom:1px solid #2A2A2E}
       if(cloudEntries  && cloudEntries.length  > 0)  entries     = cloudEntries;
       if(cloudLog      && cloudLog.length      > 0)  activityLog = cloudLog;
 
+      cloudReady = true; // now safe to save
       if(indicator){ indicator.textContent = "☁️ Sincronizado"; indicator.style.color="#22C55E"; }
       renderAll();
     }
 
     // auto-save whenever data changes
+    let cloudReady = false; // only save after loading from cloud
+
     function cloudSaveAll(){
+      if(!cloudReady) return; // never save before loading
       saveToCloud("products", products);
       saveToCloud("orders", orders);
       saveToCloud("regions", regions);
@@ -2528,7 +2532,7 @@ function parseCSV(text){
 // ── render all ─────────────────────────────────────────────────────────────────
 function renderAll(){
   renderExp();renderOrders();renderProds();renderSemLoc();renderEntries();renderReport();renderRegions();renderUserList();renderLogs();renderMapSummary();updateHeader();
-  if(typeof cloudSaveAll === 'function') cloudSaveAll();
+  // cloudSaveAll is called explicitly by user actions only — not on every render
 }
 
 // ── init ───────────────────────────────────────────────────────────────────────
