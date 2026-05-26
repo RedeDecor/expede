@@ -1222,7 +1222,13 @@ function renderFoundProduct(p){
     : `<strong style="color:#E85D04;font-size:16px">${locs[0]?.location||"Não definida"}</strong>`;
 
   return `<div class="found-box">
-    <div style="color:#22C55E;font-weight:700;margin-bottom:8px">✅ ENCONTRADO</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="color:#22C55E;font-weight:700">✅ ENCONTRADO</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px" onclick="startEditFromSearch('${p.id}')">✏️ Editar</button>
+        <button class="btn btn-warn" style="padding:4px 12px;font-size:12px" onclick="startEditLocFromSearch('${p.id}')">📍 Localização</button>
+      </div>
+    </div>
     <div class="found-grid">
       <div><span style="color:#666">Nome:</span> ${p.name}</div>
       <div><span style="color:#666">SKU:</span> ${p.sku||"—"}</div>
@@ -1231,6 +1237,26 @@ function renderFoundProduct(p){
       <div><span style="color:#666">Estoque total:</span> <strong style="color:${total>0?"#22C55E":"#EF4444"};font-size:16px">${total} un.</strong></div>
     </div>
   </div>`;
+}
+
+function startEditFromSearch(id){
+  const p = products.find(x=>x.id===id);
+  if(!p) return;
+  // fill the edit form and scroll to it
+  startEditProd(id);
+  document.getElementById("np_barcode").scrollIntoView({behavior:"smooth", block:"center"});
+  document.getElementById("np_barcode").focus();
+}
+
+function startEditLocFromSearch(id){
+  const p = products.find(x=>x.id===id);
+  if(!p) return;
+  startEditLoc(id);
+  // scroll to product in table
+  setTimeout(()=>{
+    const row = document.querySelector(`[onclick*="${id}"]`);
+    if(row) row.scrollIntoView({behavior:"smooth", block:"center"});
+  }, 100);
 }
 
 function selectFoundProduct(id){
@@ -2285,14 +2311,37 @@ function mapScan(val){
   const prod = products.find(p => p.barcode === barcode);
   const ts = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
 
+  // auto-set region to mapeando if still ativa
+  const curReg = regions.find(r=>r.name===region);
+  if(curReg && (!curReg.status||curReg.status==="ativa")){
+    regions = regions.map(r=>r.name===region?{...r,status:"mapeando"}:r);
+  }
+
   if(prod){
     const oldLoc = prod.location;
-    products = products.map(p => p.barcode === barcode ? {...p, location: region} : p);
-    mapLog.unshift({barcode, name: prod.name, region, oldLoc, found: true, ts});
+    const locs = getLocations(prod);
+    const existingLoc = locs.find(l=>l.location===region);
+
+    if(existingLoc){
+      // already mapped here — increment qty by 1
+      products = products.map(p => p.barcode === barcode
+        ? {...p, locations: locs.map(l=>l.location===region ? {...l, qty: l.qty+1} : l),
+           qty: getTotalQty(p)+1}
+        : p);
+      mapLog.unshift({barcode, name:prod.name, region, oldLoc, found:true, ts, increment:true});
+      showToast(`📍 ${prod.name} → ${region} (+1 un.)`);
+    } else {
+      // new location for this product
+      const newLocs = [...locs.filter(l=>l.location!==region), {location:region, qty:1}];
+      products = products.map(p => p.barcode === barcode
+        ? {...p, location:region, locations:newLocs, qty: newLocs.reduce((s,l)=>s+l.qty,0)}
+        : p);
+      mapLog.unshift({barcode, name:prod.name, region, oldLoc, found:true, ts, increment:false});
+      showToast(`📍 ${prod.name} → ${region}`);
+    }
     if(typeof cloudSaveAll==="function") cloudSaveAll();
-  showToast(`📍 ${prod.name} → ${region}`);
   } else {
-    mapLog.unshift({barcode, name: null, region, found: false, ts});
+    mapLog.unshift({barcode, name:null, region, found:false, ts});
     showToast("⚠️ Código não encontrado no estoque.", "err");
   }
 
@@ -2309,10 +2358,13 @@ function renderMapLog(){
     if(entry.found){
       const changed = entry.oldLoc && entry.oldLoc !== entry.region
         ? `<span style="color:#888;text-decoration:line-through;margin-right:4px">${entry.oldLoc}</span>→ ` : "";
+      // count how many times this barcode was scanned to this region
+      const scanCount = mapLog.filter(e=>e.found && e.barcode===entry.barcode && e.region===entry.region).length;
+      const countBadge = scanCount > 1 ? `<span style="background:#E85D04;color:#fff;border-radius:99px;font-size:11px;padding:1px 8px;font-weight:700;margin-left:6px">${scanCount} un.</span>` : "";
       return `<div style="display:flex;align-items:center;gap:10px;background:#0D2818;border:1px solid #22C55E33;border-radius:8px;padding:8px 12px">
-        <span style="font-size:18px">✅</span>
+        <span style="font-size:18px">${entry.increment?"➕":"✅"}</span>
         <div style="flex:1">
-          <div style="font-weight:600;font-size:13px">${entry.name}</div>
+          <div style="font-weight:600;font-size:13px">${entry.name}${countBadge}</div>
           <div style="font-size:11px;color:#888;font-family:'Courier New',monospace">${entry.barcode}</div>
         </div>
         <div style="text-align:right">
