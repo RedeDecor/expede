@@ -2353,6 +2353,11 @@ function mapScan(val){
   renderMapSummary();
   renderProds();
   updateHeader();
+  // return focus to scan input immediately
+  setTimeout(()=>{
+    const inp = document.getElementById("mapScanInput");
+    if(inp && !inp.disabled) inp.focus();
+  }, 50);
 }
 
 function renderMapLog(){
@@ -2510,6 +2515,11 @@ function quickRegister(barcode){
   renderMapSummary();
   renderProds();
   updateHeader();
+  // return focus to scan input immediately
+  setTimeout(()=>{
+    const inp = document.getElementById("mapScanInput");
+    if(inp && !inp.disabled) inp.focus();
+  }, 50);
 }
 
 function clearMapLog(){
