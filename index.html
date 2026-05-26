@@ -844,6 +844,7 @@ function showSubTab(key){
   document.querySelectorAll(".sub-btn").forEach(b=>b.classList.remove("active"));
   document.getElementById("sub-"+key).classList.add("active");
   document.getElementById("sbtn-"+key).classList.add("active");
+  if(key==="mapeamento") renderMapSummary();
 }
 
 // ── header & badges ────────────────────────────────────────────────────────────
@@ -2474,7 +2475,7 @@ function parseCSV(text){
 
 // ── render all ─────────────────────────────────────────────────────────────────
 function renderAll(){
-  renderExp();renderOrders();renderProds();renderSemLoc();renderEntries();renderReport();renderRegions();renderUserList();renderLogs();updateHeader();
+  renderExp();renderOrders();renderProds();renderSemLoc();renderEntries();renderReport();renderRegions();renderUserList();renderLogs();renderMapSummary();updateHeader();
   if(typeof cloudSaveAll === 'function') cloudSaveAll();
 }
 
