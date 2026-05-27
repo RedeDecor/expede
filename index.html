@@ -1549,7 +1549,7 @@ function renderImportReview(){
       matchCell=`<div style="background:#0D2818;border:1px solid #22C55E;border-radius:8px;padding:8px 12px;font-size:12px">
         <div style="color:#22C55E;font-weight:700;margin-bottom:3px">✅ Produto encontrado</div>
         <div style="color:#F0F0F0;font-weight:600">${matched.name}</div>
-        <div style="color:#888;font-size:11px">SKU: ${matched.sku} · Estoque atual: <strong style="color:#22C55E">${matched.qty} un.</strong> → depois: <strong style="color:#E85D04">${matched.qty+item.qty} un.</strong></div>
+        <div style="color:#888;font-size:11px">SKU: ${matched.sku} · Estoque atual: <strong style="color:#22C55E">${matched.qty} un.</strong> → depois: <strong style="color:${importMode==='set'?(item.qty<matched.qty?'#EF4444':'#F59E0B'):'#E85D04'}">${importMode==='set'?item.qty:matched.qty+item.qty} un.</strong>${importMode==='set'?' <span style="color:#F59E0B;font-size:10px">(substituindo)</span>':''}</div>
         <button class="btn btn-secondary" style="padding:3px 8px;font-size:11px;margin-top:6px" onclick="unlinkItem('${item.id}')">🔗 Trocar vínculo</button>
       </div>`;
     } else if(item.action==="link"){
