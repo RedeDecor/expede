@@ -2370,10 +2370,13 @@ function renderMapLog(){
       // count how many times this barcode was scanned to this region
       const scanCount = mapLog.filter(e=>e.found && e.barcode===entry.barcode && e.region===entry.region).length;
       const countBadge = scanCount > 1 ? `<span style="background:#E85D04;color:#fff;border-radius:99px;font-size:11px;padding:1px 8px;font-weight:700;margin-left:6px">${scanCount} un.</span>` : "";
-      return `<div style="display:flex;align-items:center;gap:10px;background:#0D2818;border:1px solid #22C55E33;border-radius:8px;padding:8px 12px">
-        <span style="font-size:18px">${entry.increment?"➕":"✅"}</span>
+      const zeroBadge = entry.zeroStock ? `<span style="background:#EF4444;color:#fff;border-radius:99px;font-size:11px;padding:1px 8px;font-weight:700;margin-left:6px">⚠️ ESTOQUE ZERO</span>` : "";
+      const bg = entry.zeroStock ? "#2B0A0A" : "#0D2818";
+      const border = entry.zeroStock ? "#EF444433" : "#22C55E33";
+      return `<div style="display:flex;align-items:center;gap:10px;background:${bg};border:1px solid ${border};border-radius:8px;padding:8px 12px">
+        <span style="font-size:18px">${entry.zeroStock?"⚠️":entry.increment?"➕":"✅"}</span>
         <div style="flex:1">
-          <div style="font-weight:600;font-size:13px">${entry.name}${countBadge}</div>
+          <div style="font-weight:600;font-size:13px">${entry.name}${countBadge}${zeroBadge}</div>
           <div style="font-size:11px;color:#888;font-family:'Courier New',monospace">${entry.barcode}</div>
         </div>
         <div style="text-align:right">
