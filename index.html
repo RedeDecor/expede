@@ -2379,9 +2379,10 @@ function renderMapLog(){
           <div style="font-weight:600;font-size:13px">${entry.name}${countBadge}${zeroBadge}</div>
           <div style="font-size:11px;color:#888;font-family:'Courier New',monospace">${entry.barcode}</div>
         </div>
-        <div style="text-align:right">
+        <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
           <div style="font-size:13px">${changed}<strong style="color:#E85D04;font-family:'Courier New',monospace">${entry.region}</strong></div>
           <div style="font-size:11px;color:#666">${entry.ts}</div>
+          <button onclick="undoMapScan('${entry.id}')" style="background:transparent;border:1px solid #EF4444;color:#EF4444;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:inherit">↩ Desfazer</button>
         </div>
       </div>`;
     } else {
@@ -2523,6 +2524,47 @@ function quickRegister(barcode){
     const inp = document.getElementById("mapScanInput");
     if(inp && !inp.disabled) inp.focus();
   }, 50);
+}
+
+
+function undoMapScan(logId){
+  const entry = mapLog.find(e=>e.id===logId);
+  if(!entry) return;
+
+  const prod = products.find(p=>p.barcode===entry.barcode);
+  if(!prod){ showToast("Produto não encontrado.","err"); return; }
+
+  const locs = getLocations(prod);
+  const locEntry = locs.find(l=>l.location===entry.region);
+
+  if(!locEntry){ showToast("Localização não encontrada.","err"); return; }
+
+  if(entry.increment){
+    // was an increment — just subtract 1
+    const newLocs = locs.map(l=>l.location===entry.region ? {...l, qty:Math.max(0,l.qty-1)} : l)
+                        .filter(l=>l.qty>0||l.location===entry.region);
+    products = products.map(p=>p.barcode===entry.barcode
+      ? {...p, locations:newLocs, qty:newLocs.reduce((s,l)=>s+l.qty,0)}
+      : p);
+    showToast(`↩ Desfeito: -1 un. de ${entry.name} em ${entry.region}`);
+  } else {
+    // was a new location — remove it entirely
+    const newLocs = locs.filter(l=>l.location!==entry.region);
+    products = products.map(p=>p.barcode===entry.barcode
+      ? {...p, locations:newLocs, location:newLocs[0]?.location||"", qty:newLocs.reduce((s,l)=>s+l.qty,0)}
+      : p);
+    showToast(`↩ Desfeito: ${entry.name} removido de ${entry.region}`);
+  }
+
+  // remove from log
+  mapLog = mapLog.filter(e=>e.id!==logId);
+  if(typeof cloudSaveAll==="function") cloudSaveAll();
+  renderMapLog();
+  renderMapSummary();
+  renderProds();
+  updateHeader();
+  // refocus scan input
+  setTimeout(()=>{ const inp=document.getElementById("mapScanInput"); if(inp&&!inp.disabled) inp.focus(); },50);
 }
 
 function clearMapLog(){
