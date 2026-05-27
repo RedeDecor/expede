@@ -2289,6 +2289,7 @@ function renderRegions(){
     if(status==="ativa")      nextBtn=`<button class="btn btn-warn" style="padding:4px 10px;font-size:11px" onclick="setRegionStatus('${r.id}','mapeando')">🔄 Iniciar Mapeamento</button>`;
     if(status==="mapeando")   nextBtn=`<button class="btn btn-success" style="padding:4px 10px;font-size:11px" onclick="setRegionStatus('${r.id}','finalizada')">✅ Finalizar Área</button>`;
     if(status==="finalizada") nextBtn=`<button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="setRegionStatus('${r.id}','mapeando')">↩ Reabrir</button>`;
+    const clearBtn = currentUser?.role==="admin" ? `<button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="clearRegionMapping('${r.name}')">🗑️ Limpar Mapeamento</button>` : "";
     return `<div style="margin-left:${indent}px">
       <div style="display:flex;align-items:center;gap:10px;background:${st.bg};border-radius:9px;padding:10px 14px;flex-wrap:wrap;border:1px solid ${status==="finalizada"?"#22C55E33":status==="mapeando"?"#F59E0B33":"transparent"};${depth>0?'border-left:3px solid #3A3A3E':''}">
         <span style="font-size:16px">${depth===0?"🏢":"📦"}</span>
@@ -2299,6 +2300,7 @@ function renderRegions(){
         ${prodCount>0?`<span style="background:#252528;border:1px solid #3A3A3E;color:#22C55E;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:700">${prodCount} produto(s)</span>`:""}
         <span style="color:${st.color};font-size:12px;font-weight:700">${st.icon} ${st.label}</span>
         ${nextBtn}
+        ${clearBtn}
         <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="startRenameRegion('${r.id}')">✏️</button>
         <button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="deleteRegion('${r.id}')">🗑️</button>
       </div>
@@ -2328,6 +2330,25 @@ function renderRegions(){
       <div class="card count-card"><div class="count-dot" style="background:#666"></div><div><div class="count-label">Pendentes</div><div class="count-num" style="color:#888">${ativa}</div></div></div>
       <div class="card count-card"><div><div class="count-label">Progresso</div><div class="count-num" style="color:#E85D04">${pct}%</div></div></div>`;
   }
+}
+
+
+function clearRegionMapping(regionName){
+  const prods = products.filter(p=>getLocationNames(p).includes(regionName));
+  if(!prods.length){ showToast("Nenhum produto nessa região.","err"); return; }
+  if(!confirm(`Remover localização "${regionName}" de ${prods.length} produto(s)? As quantidades não serão alteradas.`)) return;
+
+  products = products.map(p=>{
+    const locs = getLocations(p).filter(l=>l.location!==regionName);
+    return {...p, locations:locs, location:locs[0]?.location||"", qty:getTotalQty({...p,locations:locs.length?locs:getLocations(p)})};
+  });
+
+  // reset region status to ativa
+  regions = regions.map(r=>r.name===regionName?{...r,status:"ativa"}:r);
+
+  if(typeof cloudSaveAll==="function") cloudSaveAll();
+  showToast(`✅ Mapeamento da ${regionName} limpo! ${prods.length} produto(s) sem localização.`);
+  renderAll();
 }
 
 function setRegionStatus(id, status){
