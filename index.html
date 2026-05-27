@@ -2625,6 +2625,43 @@ function undoMapScan(logId){
   setTimeout(()=>{ const inp=document.getElementById("mapScanInput"); if(inp&&!inp.disabled) inp.focus(); },50);
 }
 
+
+function exportRegionCSV(){
+  const activeFilter = document.getElementById("mapRegionFilter")?.value||"";
+  
+  // build region map
+  const byRegion = {};
+  products.forEach(p=>{
+    const locs = getLocations(p);
+    locs.forEach(l=>{
+      if(!l.location) return;
+      if(!byRegion[l.location]) byRegion[l.location]=[];
+      if(!byRegion[l.location].find(x=>x.barcode===p.barcode))
+        byRegion[l.location].push({barcode:p.barcode, name:p.name, sku:p.sku, qty:l.qty, totalQty:getTotalQty(p)});
+    });
+  });
+
+  const regionKeys = activeFilter ? [activeFilter] : Object.keys(byRegion).sort();
+  if(!regionKeys.length || !byRegion[regionKeys[0]]){
+    showToast("Selecione uma região para exportar.","err"); return;
+  }
+
+  let csv = "Regiao;Produto;SKU;EAN;Qtd na Regiao;Qtd Total Estoque\n";
+  regionKeys.forEach(r=>{
+    (byRegion[r]||[]).forEach(p=>{
+      csv += `${r};${p.name};${p.sku};${p.barcode};${p.qty};${p.totalQty}
+`;
+    });
+  });
+
+  const fname = activeFilter ? `regiao_${activeFilter.replace(/[^a-zA-Z0-9]/g,"_")}.csv` : `todas_regioes_${new Date().toISOString().slice(0,10)}.csv`;
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href=url; a.download=fname; a.click();
+  URL.revokeObjectURL(url);
+  showToast(`📤 Exportado: ${fname}`);
+}
+
 function clearMapLog(){
   if(!mapLog.length) return;
   if(confirm("Limpar o log de mapeamento desta sessão?")){ mapLog=[]; renderMapLog(); renderMapSummary(); }
