@@ -2601,18 +2601,15 @@ function undoMapScan(logId){
   if(!locEntry){ showToast("Localização não encontrada.","err"); return; }
 
   if(entry.increment){
-    // was an increment — just subtract 1
-    const newLocs = locs.map(l=>l.location===entry.region ? {...l, qty:Math.max(0,l.qty-1)} : l)
-                        .filter(l=>l.qty>0||l.location===entry.region);
-    products = products.map(p=>p.barcode===entry.barcode
-      ? {...p, locations:newLocs, qty:newLocs.reduce((s,l)=>s+l.qty,0)}
-      : p);
-    showToast(`↩ Desfeito: -1 un. de ${entry.name} em ${entry.region}`);
+    // was a duplicate scan — just remove from log, no qty change needed
+    showToast(`↩ Bipe duplicado removido do log`);
   } else {
-    // was a new location — remove it entirely
+    // was a new location mapping — remove the location
+    const locs = getLocations(prod);
     const newLocs = locs.filter(l=>l.location!==entry.region);
+    const totalQty = getTotalQty(prod);
     products = products.map(p=>p.barcode===entry.barcode
-      ? {...p, locations:newLocs, location:newLocs[0]?.location||"", qty:newLocs.reduce((s,l)=>s+l.qty,0)}
+      ? {...p, locations:newLocs, location:newLocs[0]?.location||"", qty:totalQty}
       : p);
     showToast(`↩ Desfeito: ${entry.name} removido de ${entry.region}`);
   }
