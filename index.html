@@ -445,10 +445,6 @@ thead tr{border-bottom:1px solid #2A2A2E}
 
   <!-- sub: ENTRADA -->
   <div id="sub-entrada" class="sub-page">
-    <div id="semLocCard" style="display:none" class="card card-warn">
-      <div class="stitle" id="semLocTitle">📍 Produtos Aguardando Localização</div>
-      <div id="semLocList" style="display:flex;flex-direction:column;gap:8px"></div>
-    </div>
     <div id="importOptions" class="grid2">
       <div class="card">
         <div class="stitle">📄 Importar XML da NF-e</div>
@@ -459,6 +455,11 @@ thead tr{border-bottom:1px solid #2A2A2E}
       <div class="card">
         <div class="stitle">📊 Importar CSV / Excel</div>
         <p class="hint">Exportado do Bling ou qualquer sistema.<br>Colunas: <code>nome, codigo_barras, sku, quantidade</code></p>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button id="modeAdd" class="btn btn-primary" style="flex:1;font-size:12px;padding:8px" onclick="setImportMode('add')">➕ Entrada (somar)</button>
+          <button id="modeSet" class="btn btn-secondary" style="flex:1;font-size:12px;padding:8px" onclick="setImportMode('set')">🔄 Ajuste (substituir)</button>
+        </div>
+        <div id="importModeHint" style="font-size:11px;color:#888;margin-bottom:8px">Modo atual: <strong style="color:#22C55E">Entrada</strong> — soma ao estoque existente</div>
         <input type="file" id="csvEntryFile" accept=".csv,.txt" style="display:none" onchange="importEntryCSV(this)">
         <button class="btn btn-primary w100" onclick="document.getElementById('csvEntryFile').click()">📂 Selecionar CSV</button>
       </div>
@@ -469,6 +470,10 @@ thead tr{border-bottom:1px solid #2A2A2E}
         <button class="btn btn-primary w100" id="blingEBtn" onclick="fetchBlingEntry()">🔄 Buscar do Bling</button>
         <p style="font-size:10px;color:#555;margin-top:8px">⚙️ Sincronização automática requer configuração de servidor.</p>
       </div>
+    </div>
+    <div id="semLocCard" style="display:none" class="card card-warn">
+      <div class="stitle" id="semLocTitle">📍 Produtos Aguardando Localização</div>
+      <div id="semLocList" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
     <div id="reviewCard" class="card" style="display:none">
       <div class="flex-wrap mb12">
@@ -772,6 +777,24 @@ let orders   = [];
 let entries = [];
 let importedItems = [];
 let importSource = null;
+let importMode = "add"; // "add" = soma, "set" = substitui
+
+function setImportMode(mode){
+  importMode = mode;
+  document.getElementById("modeAdd").className = "btn " + (mode==="add"?"btn-primary":"btn-secondary");
+  document.getElementById("modeSet").className = "btn " + (mode==="set"?"btn-primary":"btn-secondary");
+  document.getElementById("modeAdd").style.flex = "1";
+  document.getElementById("modeSet").style.flex = "1";
+  document.getElementById("modeAdd").style.fontSize = "12px";
+  document.getElementById("modeSet").style.fontSize = "12px";
+  document.getElementById("modeAdd").style.padding = "8px";
+  document.getElementById("modeSet").style.padding = "8px";
+  const hint = document.getElementById("importModeHint");
+  if(hint){
+    if(mode==="add") hint.innerHTML = `Modo atual: <strong style="color:#22C55E">Entrada</strong> — soma ao estoque existente`;
+    else hint.innerHTML = `Modo atual: <strong style="color:#F59E0B">Ajuste</strong> — substitui a quantidade existente`;
+  }
+}
 let editProdId = null;
 let editLocId = null;
 let pendingPrepareId = null;
@@ -1613,9 +1636,18 @@ function confirmEntry(){
     if(item.action==="update"&&item.matchedProduct){
       const ex=map.get(item.matchedProduct.id);
       if(ex){
-        // preserve all existing locations — just add qty to the right location
         const finalLoc = locVal || ex.location || "";
-        const updated_p = addLocationQty(ex, finalLoc, item.qty);
+        let updated_p;
+        if(importMode === "set"){
+          // AJUSTE: substitui a quantidade, preserva localização
+          const locs = getLocations(ex);
+          const newLocs = locs.map(l=>l.location===finalLoc ? {...l, qty:item.qty} : l);
+          if(!newLocs.find(l=>l.location===finalLoc) && finalLoc) newLocs.push({location:finalLoc, qty:item.qty});
+          updated_p = {...ex, locations:newLocs, location:ex.location||finalLoc, qty:newLocs.reduce((s,l)=>s+l.qty,0)};
+        } else {
+          // ENTRADA: soma ao estoque existente
+          updated_p = addLocationQty(ex, finalLoc, item.qty);
+        }
         map.set(ex.id, updated_p);
         if(ex.location && ex.location!==locVal) locPreserved++;
         updated++;
