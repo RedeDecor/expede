@@ -2233,7 +2233,8 @@ function getRegionStatus(regionName){
 
 function allRegionPaths(){
   // returns flat list of full path strings for dropdowns e.g. "Estoque Principal > Setor A1"
-  const roots = regions.filter(r=>!r.parentId || r.parentId==="null" || r.parentId===null);
+  const roots = regions.filter(r=>!r.parentId || r.parentId==="null" || r.parentId===null || r.parentId===undefined);
+  console.log("regions total:", regions.length, "roots:", roots.length, "sample:", JSON.stringify(regions[0]));
   const result = [];
   function walk(r, prefix){
     const path = prefix ? prefix+" > "+r.name : r.name;
@@ -2269,7 +2270,8 @@ function deleteRegion(id){
 }
 
 function renderRegions(){
-  const roots = regions.filter(r=>!r.parentId || r.parentId==="null" || r.parentId===null);
+  const roots = regions.filter(r=>!r.parentId || r.parentId==="null" || r.parentId===null || r.parentId===undefined);
+  console.log("regions total:", regions.length, "roots:", roots.length, "sample:", JSON.stringify(regions[0]));
   const listTitle = document.getElementById("regListTitle");
   if(listTitle) listTitle.textContent = `📍 ${regions.length} Região(ões) Cadastrada(s)`;
 
