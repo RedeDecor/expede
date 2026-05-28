@@ -4,8 +4,16 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>EXPEDE — Gestão de Estoque & Envios</title>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+// Load Firebase dynamically with fallback
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+window.firebaseLoaded = false;
+Promise.all([
+  loadScript('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js'),
+  loadScript('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js')
+]).then(()=>{ window.firebaseLoaded=true; if(window.onFirebaseReady) window.onFirebaseReady(); })
+  .catch(e=>{ console.warn('Firebase failed to load, running offline:', e); if(window.onFirebaseReady) window.onFirebaseReady(true); });
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#111113;color:#F0F0F0;font-family:'Segoe UI',Arial,sans-serif;min-height:100vh;padding-bottom:60px}
@@ -719,6 +727,19 @@ thead tr{border-bottom:1px solid #2A2A2E}
 
       // block any saves until fully loaded
       cloudReady = false;
+
+      // wait for Firebase SDK to load (max 5 seconds)
+      if(!window.firebaseLoaded){
+        await new Promise(res=>{ const t=setTimeout(()=>res(),5000); window.onFirebaseReady=(offline)=>{ clearTimeout(t); res(offline); }; });
+      }
+
+      if(!window.firebaseLoaded){
+        console.warn("Firebase not available — running offline");
+        cloudReady=true;
+        const indicator=document.getElementById("cloudIndicator");
+        if(indicator){ indicator.textContent="☁️ Offline"; indicator.style.color="#EF4444"; }
+        renderAll(); return;
+      }
 
       try {
         const [cloudProducts, cloudOrders, cloudRegions, cloudUsers, cloudEntries, cloudLog] = await Promise.all([
