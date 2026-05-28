@@ -1647,11 +1647,18 @@ function confirmEntry(){
         const finalLoc = locVal || ex.location || "";
         let updated_p;
         if(importMode === "set"){
-          // AJUSTE: substitui a quantidade, preserva localização
+          // AJUSTE: substitui quantidade total, preserva localizações existentes
           const locs = getLocations(ex);
-          const newLocs = locs.map(l=>l.location===finalLoc ? {...l, qty:item.qty} : l);
-          if(!newLocs.find(l=>l.location===finalLoc) && finalLoc) newLocs.push({location:finalLoc, qty:item.qty});
-          updated_p = {...ex, locations:newLocs, location:ex.location||finalLoc, qty:newLocs.reduce((s,l)=>s+l.qty,0)};
+          if(locs.length <= 1){
+            // produto em 1 local ou sem local — substitui direto
+            const loc = locs[0]?.location || finalLoc || "";
+            updated_p = {...ex, locations:[{location:loc, qty:item.qty}], location:loc, qty:item.qty};
+          } else {
+            // produto em múltiplos locais — distribui proporcionalmente
+            const totalAtual = locs.reduce((s,l)=>s+l.qty,0);
+            const newLocs = locs.map(l=>({...l, qty: totalAtual>0 ? Math.round(item.qty*(l.qty/totalAtual)) : 0}));
+            updated_p = {...ex, locations:newLocs, qty:item.qty};
+          }
         } else {
           // ENTRADA: soma ao estoque existente
           updated_p = addLocationQty(ex, finalLoc, item.qty);
