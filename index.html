@@ -1468,6 +1468,7 @@ function renderProds(){
 function renderSemLoc(){
   const list=products.filter(p=>!p.location);
   const card=document.getElementById("semLocCard");
+  if(!card) return;
   if(!list.length){card.style.display="none";return;}
   card.style.display="block";
   document.getElementById("semLocTitle").textContent=`📍 ${list.length} Produto(s) Aguardando Localização`;
@@ -2325,6 +2326,7 @@ function renderRegions(){
   }
 
   function renderNode(r, depth){
+    try {
     const indent = depth * 20;
     const children = getChildren(r.id);
     const prodCount = products.filter(p => getLocationNames(p).includes(r.name)).length;
@@ -2358,9 +2360,12 @@ function renderRegions(){
       </div>
       ${childrenHtml}
     </div>`;
+    } catch(e){ return `<div style="padding:6px 12px;color:#888;font-size:12px">⚠️ ${r ? r.name : 'erro'}</div>`; }
   }
 
-  el.innerHTML = roots.map(r => renderNode(r, 0)).join("");
+  let html = "";
+  roots.forEach(r => { try { html += renderNode(r, 0); } catch(e){ html += `<div style="color:#EF4444;padding:8px">${r.name}: erro</div>`; } });
+  el.innerHTML = html;
 
   // summary
   const sumEl = document.getElementById("regStatusSummary");
