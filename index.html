@@ -717,25 +717,34 @@ thead tr{border-bottom:1px solid #2A2A2E}
       const indicator = document.getElementById("cloudIndicator");
       if(indicator){ indicator.textContent = "☁️ Carregando..."; indicator.style.color="#F59E0B"; }
 
-      const [cloudProducts, cloudOrders, cloudRegions, cloudUsers, cloudEntries, cloudLog] = await Promise.all([
-        loadFromCloud("products"),
-        loadFromCloud("orders"),
-        loadFromCloud("regions"),
-        loadFromCloud("users"),
-        loadFromCloud("entries"),
-        loadFromCloud("activityLog"),
-      ]);
+      // block any saves until fully loaded
+      cloudReady = false;
 
-      // Only replace local data if cloud has data (never overwrite with empty)
-      if(cloudProducts && cloudProducts.length > 0)  products    = cloudProducts;
-      if(cloudOrders   && cloudOrders.length   > 0)  orders      = cloudOrders;
-      if(cloudRegions  && cloudRegions.length  > 0)  regions     = cloudRegions;
-      if(cloudUsers    && cloudUsers.length    > 0)  USERS       = cloudUsers;
-      if(cloudEntries  && cloudEntries.length  > 0)  entries     = cloudEntries;
-      if(cloudLog      && cloudLog.length      > 0)  activityLog = cloudLog;
+      try {
+        const [cloudProducts, cloudOrders, cloudRegions, cloudUsers, cloudEntries, cloudLog] = await Promise.all([
+          loadFromCloud("products"),
+          loadFromCloud("orders"),
+          loadFromCloud("regions"),
+          loadFromCloud("users"),
+          loadFromCloud("entries"),
+          loadFromCloud("activityLog"),
+        ]);
 
-      cloudReady = true; // now safe to save
-      if(indicator){ indicator.textContent = "☁️ Sincronizado"; indicator.style.color="#22C55E"; }
+        // Only replace local data if cloud has data (never overwrite with empty)
+        if(cloudProducts && cloudProducts.length > 0)  products    = cloudProducts;
+        if(cloudOrders   && cloudOrders.length   > 0)  orders      = cloudOrders;
+        if(cloudRegions  && cloudRegions.length  > 0)  regions     = cloudRegions;
+        if(cloudUsers    && cloudUsers.length    > 0)  USERS       = cloudUsers;
+        if(cloudEntries  && cloudEntries.length  > 0)  entries     = cloudEntries;
+        if(cloudLog      && cloudLog.length      > 0)  activityLog = cloudLog;
+
+        cloudReady = true; // now safe to save
+        if(indicator){ indicator.textContent = "☁️ Sincronizado"; indicator.style.color="#22C55E"; }
+      } catch(e) {
+        console.error("Cloud load error:", e);
+        cloudReady = true; // allow saves even if load failed
+        if(indicator){ indicator.textContent = "☁️ Erro ao carregar"; indicator.style.color="#EF4444"; }
+      }
       renderAll();
     }
 
@@ -744,12 +753,13 @@ thead tr{border-bottom:1px solid #2A2A2E}
 
     function cloudSaveAll(){
       if(!cloudReady) return; // never save before loading
-      saveToCloud("products", products);
-      saveToCloud("orders", orders);
-      saveToCloud("regions", regions);
-      saveToCloud("users", USERS);
-      saveToCloud("entries", entries);
-      saveToCloud("activityLog", activityLog);
+      // only save non-empty collections to prevent accidental overwrites
+      if(products.length > 0)     saveToCloud("products", products);
+      if(orders.length > 0)       saveToCloud("orders", orders);
+      if(regions.length > 0)      saveToCloud("regions", regions);
+      if(USERS.length > 0)        saveToCloud("users", USERS);
+      if(entries.length > 0)      saveToCloud("entries", entries);
+      if(activityLog.length > 0)  saveToCloud("activityLog", activityLog);
       const indicator = document.getElementById("cloudIndicator");
       if(indicator){ indicator.textContent = "☁️ Salvo"; indicator.style.color="#22C55E"; }
     }
