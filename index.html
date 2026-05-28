@@ -1265,6 +1265,7 @@ function renderFoundProduct(p){
       <div style="display:flex;gap:8px">
         <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px" onclick="startEditFromSearch('${p.id}')">✏️ Editar</button>
         <button class="btn btn-warn" style="padding:4px 12px;font-size:12px" onclick="startEditLocFromSearch('${p.id}')">📍 Localização</button>
+        <button class="btn btn-danger" style="padding:4px 12px;font-size:12px" onclick="if(confirm('Excluir este produto?')){products=products.filter(x=>x.id!=='${p.id}');if(typeof cloudSaveAll==='function')cloudSaveAll();document.getElementById('barcodeResult').innerHTML='';document.getElementById('barcodeQ').value='';showToast('Produto excluído.');renderProds();updateHeader();}">🗑️ Excluir</button>
       </div>
     </div>
     <div class="found-grid">
