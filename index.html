@@ -4,6 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>EXPEDE — Gestão de Estoque & Envios</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#111113;color:#F0F0F0;font-family:'Segoe UI',Arial,sans-serif;min-height:100vh;padding-bottom:60px}
@@ -682,9 +684,7 @@ thead tr{border-bottom:1px solid #2A2A2E}
 <div id="toast" class="toast" style="display:none"></div>
 
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <!-- Firebase Config -->
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyDKSwM4nshEiqJGqqfNu7d-YicAgDLsri8",
@@ -2233,12 +2233,12 @@ function getRegionStatus(regionName){
 
 function allRegionPaths(){
   // returns flat list of full path strings for dropdowns e.g. "Estoque Principal > Setor A1"
-  const roots = regions.filter(r=>!r.parentId);
+  const roots = regions.filter(r=>!r.parentId || r.parentId==="null" || r.parentId===null);
   const result = [];
   function walk(r, prefix){
     const path = prefix ? prefix+" > "+r.name : r.name;
     result.push({id:r.id, path});
-    regions.filter(c=>c.parentId===r.id).forEach(c=>walk(c,path));
+    regions.filter(c=>c.parentId===r.id||c.parentId===String(r.id)).forEach(c=>walk(c,path));
   }
   roots.forEach(r=>walk(r,""));
   return result;
@@ -2269,7 +2269,7 @@ function deleteRegion(id){
 }
 
 function renderRegions(){
-  const roots = regions.filter(r=>!r.parentId);
+  const roots = regions.filter(r=>!r.parentId || r.parentId==="null" || r.parentId===null);
   const listTitle = document.getElementById("regListTitle");
   if(listTitle) listTitle.textContent = `📍 ${regions.length} Região(ões) Cadastrada(s)`;
 
@@ -2287,7 +2287,7 @@ function renderRegions(){
   function renderNode(r, depth){
     const indent = depth*24;
     const prodCount = products.filter(p=>p.location===r.name).length;
-    const children = regions.filter(c=>c.parentId===r.id);
+    const children = regions.filter(c=>c.parentId===r.id || c.parentId===String(r.id));
     const status = r.status||"ativa";
     const statusMap = {
       ativa:      {bg:"#252528",color:"#888",label:"Ativa",icon:"⚪"},
