@@ -2254,7 +2254,16 @@ function getRegionStatus(regionName){
 
 function allRegionPaths(){
   // returns flat list of full path strings for dropdowns e.g. "Estoque Principal > Setor A1"
-  const roots = regions.filter(r=>!r.parentId || r.parentId==="null" || r.parentId===null || r.parentId===undefined);
+  // Debug: show first few regions and their parentId types
+  if(regions.length > 0){
+    const sample = regions.slice(0,3).map(r=>`${r.name}: parentId=${JSON.stringify(r.parentId)} type=${typeof r.parentId}`).join(" | ");
+    console.log("renderRegions debug:", sample);
+  }
+  const roots = regions.filter(r=>{
+    const p = r.parentId;
+    return !p || p===null || p===undefined || p==="null" || p==="" || p===0 || p==="0";
+  });
+  console.log("roots found:", roots.map(r=>r.name));
 
   const result = [];
   function walk(r, prefix){
@@ -2291,87 +2300,83 @@ function deleteRegion(id){
 }
 
 function renderRegions(){
-  const roots = regions.filter(r=>!r.parentId || r.parentId==="null" || r.parentId===null || r.parentId===undefined);
-
   const listTitle = document.getElementById("regListTitle");
   if(listTitle) listTitle.textContent = `📍 ${regions.length} Região(ões) Cadastrada(s)`;
 
   // update parent select
   const sel = document.getElementById("reg_parent");
   if(sel){
-    const paths = allRegionPaths();
     sel.innerHTML = '<option value="">— Região raiz (sem pai) —</option>' +
-      paths.map(p=>`<option value="${p.id}">${p.path}</option>`).join("");
+      regions.map(r=>`<option value="${r.id}">${r.name}</option>`).join("");
   }
 
   const el = document.getElementById("regTree");
   if(!el) return;
 
-  function renderNode(r, depth){
-    const indent = depth*24;
-    const prodCount = products.filter(p=>p.location===r.name).length;
-    const children = regions.filter(c=>c.parentId===r.id || c.parentId===String(r.id));
-    const status = r.status||"ativa";
-    const statusMap = {
-      ativa:      {bg:"#252528",color:"#888",label:"Ativa",icon:"⚪"},
-      mapeando:   {bg:"#1a2a1a",color:"#F59E0B",label:"Mapeando",icon:"🔄"},
-      finalizada: {bg:"#0D2818",color:"#22C55E",label:"Finalizada ✓",icon:"✅"},
-    };
-    const st = statusMap[status];
-    let nextBtn = "";
-    if(status==="ativa")      nextBtn=`<button class="btn btn-warn" style="padding:4px 10px;font-size:11px" onclick="setRegionStatus('${r.id}','mapeando')">🔄 Iniciar Mapeamento</button>`;
-    if(status==="mapeando")   nextBtn=`<button class="btn btn-success" style="padding:4px 10px;font-size:11px" onclick="setRegionStatus('${r.id}','finalizada')">✅ Finalizar Área</button>`;
-    if(status==="finalizada") nextBtn=`<button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="setRegionStatus('${r.id}','mapeando')">↩ Reabrir</button>`;
-    const clearBtn = (currentUser && currentUser.role==="admin") ? `<button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="clearRegionMapping('${r.name}')">🗑️ Limpar Mapeamento</button>` : "";
-    return `<div style="margin-left:${indent}px">
-      <div style="display:flex;align-items:center;gap:10px;background:${st.bg};border-radius:9px;padding:10px 14px;flex-wrap:wrap;border:1px solid ${status==="finalizada"?"#22C55E33":status==="mapeando"?"#F59E0B33":"transparent"};${depth>0?'border-left:3px solid #3A3A3E':''}">
-        <span style="font-size:16px">${depth===0?"🏢":"📦"}</span>
-        <div style="flex:1;min-width:150px">
-          <div style="font-weight:700;font-size:14px">${r.name}</div>
-          ${r.desc?`<div style="font-size:12px;color:#888">${r.desc}</div>`:""}
-        </div>
-        ${prodCount>0?`<span style="background:#252528;border:1px solid #3A3A3E;color:#22C55E;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:700">${prodCount} produto(s)</span>`:""}
-        <span style="color:${st.color};font-size:12px;font-weight:700">${st.icon} ${st.label}</span>
-        ${nextBtn}
-        ${clearBtn}
-        <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="startRenameRegion('${r.id}')">✏️</button>
-        <button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="deleteRegion('${r.id}')">🗑️</button>
-      </div>
-      ${children.map(c=>renderNode(c, depth+1)).join("")}
-    </div>`;
-  }
+  // normalize parentId — Firebase may return null as object null
+  const isRoot = r => !r.parentId || r.parentId === null || r.parentId === "null" || r.parentId === undefined || r.parentId === "";
+  const roots = regions.filter(isRoot);
+  const getChildren = (id) => regions.filter(r => String(r.parentId) === String(id));
 
   if(!roots.length){
-    el.innerHTML = `<div style="color:#666;font-size:13px;padding:20px;text-align:center">Nenhuma região cadastrada. Adicione acima.</div>`;
+    el.innerHTML = `<div style="color:#666;font-size:13px;padding:20px;text-align:center">Nenhuma região cadastrada.</div>`;
     updateLocationSelect();
     return;
   }
-  try {
-    el.innerHTML = roots.map(r=>renderNode(r,0)).join("");
-  } catch(e) {
-    console.error("renderNode error:", e);
-    // fallback: render simple list
-    el.innerHTML = roots.map(r=>`<div style="background:#252528;border-radius:9px;padding:10px 14px;margin-bottom:6px">
-      <strong>${r.name}</strong>
-      <div style="font-size:12px;color:#888">${regions.filter(c=>c.parentId===r.id).map(c=>c.name).join(", ")}</div>
-    </div>`).join("");
-  }
-  updateLocationSelect();
 
-  // status summary
+  function renderNode(r, depth){
+    const indent = depth * 20;
+    const children = getChildren(r.id);
+    const prodCount = products.filter(p => getLocationNames(p).includes(r.name)).length;
+    const status = r.status || "ativa";
+    const statusColors = {finalizada:"#22C55E", mapeando:"#F59E0B", ativa:"#888"};
+    const statusIcons  = {finalizada:"✅", mapeando:"🔄", ativa:"⚪"};
+    const statusLabels = {finalizada:"Finalizada", mapeando:"Mapeando", ativa:"Ativa"};
+    const bg = status==="finalizada"?"#0D2818":status==="mapeando"?"#1a2a1a":"#252528";
+    const border = status==="finalizada"?"1px solid #22C55E33":status==="mapeando"?"1px solid #F59E0B33":"1px solid transparent";
+
+    let btns = "";
+    if(status==="ativa")      btns += `<button class="btn btn-warn" style="padding:4px 10px;font-size:11px" onclick="setRegionStatus('${r.id}','mapeando')">🔄 Iniciar</button>`;
+    if(status==="mapeando")   btns += `<button class="btn btn-success" style="padding:4px 10px;font-size:11px" onclick="setRegionStatus('${r.id}','finalizada')">✅ Finalizar</button>`;
+    if(status==="finalizada") btns += `<button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="setRegionStatus('${r.id}','mapeando')">↩ Reabrir</button>`;
+    if(currentUser && currentUser.role==="admin") btns += `<button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="clearRegionMapping('${r.name}')">🗑️ Limpar</button>`;
+    btns += `<button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="startRenameRegion('${r.id}')">✏️</button>`;
+    btns += `<button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="deleteRegion('${r.id}')">🗑️</button>`;
+
+    const childrenHtml = children.map(c => renderNode(c, depth+1)).join("");
+
+    return `<div style="margin-left:${indent}px;margin-bottom:4px">
+      <div style="display:flex;align-items:center;gap:8px;background:${bg};border-radius:9px;padding:10px 12px;flex-wrap:wrap;${border}">
+        <span>${depth===0?"🏢":"📦"}</span>
+        <div style="flex:1;min-width:120px">
+          <div style="font-weight:700;font-size:14px">${r.name}</div>
+          ${r.desc?`<div style="font-size:11px;color:#888">${r.desc}</div>`:""}
+        </div>
+        ${prodCount>0?`<span style="color:#22C55E;font-size:12px;font-weight:700">${prodCount} prod.</span>`:""}
+        <span style="color:${statusColors[status]};font-size:12px">${statusIcons[status]} ${statusLabels[status]}</span>
+        ${btns}
+      </div>
+      ${childrenHtml}
+    </div>`;
+  }
+
+  el.innerHTML = roots.map(r => renderNode(r, 0)).join("");
+
+  // summary
   const sumEl = document.getElementById("regStatusSummary");
   if(sumEl){
-    const total = regions.length;
     const fin = regions.filter(r=>r.status==="finalizada").length;
     const map = regions.filter(r=>r.status==="mapeando").length;
-    const ativa = total - fin - map;
-    const pct = total>0?Math.round((fin/total)*100):0;
+    const ativa = regions.length - fin - map;
+    const pct = regions.length>0?Math.round((fin/regions.length)*100):0;
     sumEl.innerHTML = `
       <div class="card count-card" style="border:1px solid #22C55E33"><div class="count-dot" style="background:#22C55E"></div><div><div class="count-label">Finalizadas</div><div class="count-num" style="color:#22C55E">${fin}</div></div></div>
       <div class="card count-card" style="border:1px solid #F59E0B33"><div class="count-dot" style="background:#F59E0B"></div><div><div class="count-label">Mapeando</div><div class="count-num" style="color:#F59E0B">${map}</div></div></div>
       <div class="card count-card"><div class="count-dot" style="background:#666"></div><div><div class="count-label">Pendentes</div><div class="count-num" style="color:#888">${ativa}</div></div></div>
       <div class="card count-card"><div><div class="count-label">Progresso</div><div class="count-num" style="color:#E85D04">${pct}%</div></div></div>`;
   }
+
+  updateLocationSelect();
 }
 
 
