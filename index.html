@@ -1290,12 +1290,122 @@ function startEditFromSearch(id){
 function startEditLocFromSearch(id){
   const p = products.find(x=>x.id===id);
   if(!p) return;
-  startEditLoc(id);
-  // scroll to product in table
-  setTimeout(()=>{
-    const row = document.querySelector(`[onclick*="${id}"]`);
-    if(row) row.scrollIntoView({behavior:"smooth", block:"center"});
-  }, 100);
+  
+  const locs = getLocations(p);
+  const paths = allRegionPaths();
+  
+  const locsHtml = locs.map((l,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;background:#1A1A1D;border-radius:7px;padding:7px 10px">
+      <span style="background:#E85D04;color:#fff;padding:2px 10px;border-radius:6px;font-family:'Courier New',monospace;font-weight:700;font-size:12px;flex:1">${l.location||"Sem local"}</span>
+      <input type="number" value="${l.qty}" min="0" style="width:65px;padding:5px 8px;font-size:13px" 
+        onchange="updateInlineLocQty('${id}',${i},this.value)">
+      <span style="color:#888;font-size:12px">un.</span>
+      <button onclick="removeInlineLoc('${id}',${i})" style="background:transparent;border:1px solid #EF4444;color:#EF4444;border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer">🗑️</button>
+    </div>`).join("");
+
+  const addHtml = `
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <select id="inlineLocSel_${id}" style="flex:1;font-family:inherit;font-size:12px;padding:7px 10px;background:#252528;border:1px solid #3A3A3E;border-radius:7px;color:#F0F0F0">
+        <option value="">— Adicionar localização —</option>
+        ${paths.map(p=>`<option value="${p.path.split(" > ").pop()}">${p.path}</option>`).join("")}
+      </select>
+      <input type="number" id="inlineLocQty_${id}" value="1" min="1" style="width:65px;padding:7px 8px;font-size:13px">
+      <button onclick="addInlineLoc('${id}')" style="background:#E85D04;color:#fff;border:none;border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer;font-weight:700">+ Add</button>
+    </div>`;
+
+  const el = document.getElementById("barcodeResult");
+  if(!el) return;
+
+  // inject location editor into found card
+  const locSection = el.querySelector("#inlineLocEditor");
+  if(locSection){
+    locSection.style.display = locSection.style.display==="none" ? "block" : "none";
+    return;
+  }
+
+  const editor = document.createElement("div");
+  editor.id = "inlineLocEditor";
+  editor.style.cssText = "margin-top:12px;padding-top:12px;border-top:1px solid #2A2A2E";
+  editor.innerHTML = `
+    <div style="font-size:11px;color:#888;font-weight:600;margin-bottom:8px">LOCALIZAÇÕES</div>
+    <div id="inlineLocList_${id}" style="display:flex;flex-direction:column;gap:6px">${locsHtml}</div>
+    ${addHtml}
+    <button onclick="saveInlineLocs('${id}')" style="width:100%;margin-top:10px;background:#22C55E;color:#111;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer">💾 Salvar Localizações</button>`;
+  
+  el.querySelector(".found-box").appendChild(editor);
+}
+
+// temp storage for inline editing
+let inlineEditLocs = {};
+
+function updateInlineLocQty(id, idx, val){
+  const p = products.find(x=>x.id===id);
+  if(!p) return;
+  if(!inlineEditLocs[id]) inlineEditLocs[id] = [...getLocations(p)];
+  inlineEditLocs[id][idx].qty = Math.max(0, parseInt(val)||0);
+}
+
+function removeInlineLoc(id, idx){
+  const p = products.find(x=>x.id===id);
+  if(!p) return;
+  if(!inlineEditLocs[id]) inlineEditLocs[id] = [...getLocations(p)];
+  inlineEditLocs[id].splice(idx,1);
+  // re-render
+  const list = document.getElementById(`inlineLocList_${id}`);
+  if(list) list.innerHTML = inlineEditLocs[id].map((l,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;background:#1A1A1D;border-radius:7px;padding:7px 10px">
+      <span style="background:#E85D04;color:#fff;padding:2px 10px;border-radius:6px;font-family:'Courier New',monospace;font-weight:700;font-size:12px;flex:1">${l.location||"Sem local"}</span>
+      <input type="number" value="${l.qty}" min="0" style="width:65px;padding:5px 8px;font-size:13px" 
+        onchange="updateInlineLocQty('${id}',${i},this.value)">
+      <span style="color:#888;font-size:12px">un.</span>
+      <button onclick="removeInlineLoc('${id}',${i})" style="background:transparent;border:1px solid #EF4444;color:#EF4444;border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer">🗑️</button>
+    </div>`).join("");
+}
+
+function addInlineLoc(id){
+  const sel = document.getElementById(`inlineLocSel_${id}`);
+  const qtyEl = document.getElementById(`inlineLocQty_${id}`);
+  const loc = sel?.value;
+  const qty = parseInt(qtyEl?.value)||1;
+  if(!loc){ showToast("Selecione uma localização.","err"); return; }
+  
+  const p = products.find(x=>x.id===id);
+  if(!p) return;
+  if(!inlineEditLocs[id]) inlineEditLocs[id] = [...getLocations(p)];
+  
+  const existing = inlineEditLocs[id].findIndex(l=>l.location===loc);
+  if(existing>=0) inlineEditLocs[id][existing].qty += qty;
+  else inlineEditLocs[id].push({location:loc, qty});
+  
+  if(sel) sel.value="";
+  if(qtyEl) qtyEl.value="1";
+  
+  const list = document.getElementById(`inlineLocList_${id}`);
+  if(list) list.innerHTML = inlineEditLocs[id].map((l,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;background:#1A1A1D;border-radius:7px;padding:7px 10px">
+      <span style="background:#E85D04;color:#fff;padding:2px 10px;border-radius:6px;font-family:'Courier New',monospace;font-weight:700;font-size:12px;flex:1">${l.location||"Sem local"}</span>
+      <input type="number" value="${l.qty}" min="0" style="width:65px;padding:5px 8px;font-size:13px" 
+        onchange="updateInlineLocQty('${id}',${i},this.value)">
+      <span style="color:#888;font-size:12px">un.</span>
+      <button onclick="removeInlineLoc('${id}',${i})" style="background:transparent;border:1px solid #EF4444;color:#EF4444;border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer">🗑️</button>
+    </div>`).join("");
+}
+
+function saveInlineLocs(id){
+  const p = products.find(x=>x.id===id);
+  if(!p) return;
+  const locs = inlineEditLocs[id] || getLocations(p);
+  const totalQty = locs.reduce((s,l)=>s+l.qty,0);
+  products = products.map(x=>x.id===id
+    ? {...x, locations:locs, location:locs[0]?.location||"", qty:totalQty}
+    : x);
+  delete inlineEditLocs[id];
+  if(typeof cloudSaveAll==="function") cloudSaveAll();
+  showToast("✅ Localizações salvas!");
+  // refresh the found card
+  const q = document.getElementById("barcodeQ")?.value;
+  if(q) searchBarcode(q);
+  renderProds(); updateHeader();
 }
 
 function selectFoundProduct(id){
@@ -2474,23 +2584,35 @@ function mapScan(val){
     const oldLoc = prod.location;
     const locs = getLocations(prod);
     const existingLoc = locs.find(l=>l.location===region);
+    const totalQty = getTotalQty(prod);
+    const zeroStock = totalQty <= 0;
 
     if(existingLoc){
-      // already mapped here — increment qty by 1
-      products = products.map(p => p.barcode === barcode
-        ? {...p, locations: locs.map(l=>l.location===region ? {...l, qty: l.qty+1} : l),
-           qty: getTotalQty(p)+1}
-        : p);
-      mapLog.unshift({barcode, name:prod.name, region, oldLoc, found:true, ts, increment:true});
-      showToast(`📍 ${prod.name} → ${region} (+1 un.)`);
+      // já mapeado aqui — só registra no log, NÃO altera quantidade
+      mapLog.unshift({id:"ml"+Date.now(), barcode, name:prod.name, region, oldLoc, found:true, ts, increment:true, zeroStock});
+      if(zeroStock) showToast(`⚠️ ATENÇÃO: ${prod.name} está com estoque ZERO!`, "err");
+      else showToast(`📍 ${prod.name} já está em ${region}`);
     } else {
-      // new location for this product
-      const newLocs = [...locs.filter(l=>l.location!==region), {location:region, qty:1}];
+      // nova localização — move unidades de "Sem local" para cá, NÃO soma
+      const semLocal = locs.find(l=>!l.location||l.location==="");
+      let newLocs;
+      if(locs.length === 0 || (locs.length === 1 && (!locs[0].location||locs[0].location===""))){
+        // sem localização — move tudo para esta região
+        newLocs = [{location:region, qty:totalQty}];
+      } else if(semLocal){
+        // tem "Sem local" — move essas unidades para esta região
+        newLocs = locs.filter(l=>l.location&&l.location!=="").concat([{location:region, qty:semLocal.qty}]);
+      } else {
+        // já tem outras localizações — registra sem quantidade (distribuir depois)
+        newLocs = [...locs, {location:region, qty:0}];
+      }
+      const newTotal = newLocs.reduce((s,l)=>s+l.qty, 0);
       products = products.map(p => p.barcode === barcode
-        ? {...p, location:region, locations:newLocs, qty: newLocs.reduce((s,l)=>s+l.qty,0)}
+        ? {...p, location:region, locations:newLocs, qty:newTotal}
         : p);
-      mapLog.unshift({barcode, name:prod.name, region, oldLoc, found:true, ts, increment:false});
-      showToast(`📍 ${prod.name} → ${region}`);
+      mapLog.unshift({id:"ml"+Date.now(), barcode, name:prod.name, region, oldLoc, found:true, ts, increment:false, zeroStock});
+      if(zeroStock) showToast(`⚠️ ATENÇÃO: ${prod.name} está com estoque ZERO!`, "err");
+      else showToast(`📍 ${prod.name} → ${region}`);
     }
     if(typeof cloudSaveAll==="function") cloudSaveAll();
   } else {
