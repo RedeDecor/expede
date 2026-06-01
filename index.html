@@ -1405,7 +1405,7 @@ function saveInlineLocs(id){
   // refresh the found card
   const q = document.getElementById("barcodeQ")?.value;
   if(q) searchBarcode(q);
-  renderProds(); updateHeader();
+  renderProds(); renderMapSummary(); updateHeader();
 }
 
 function selectFoundProduct(id){
@@ -1427,17 +1427,22 @@ function saveProd(){
   const qty=parseInt(document.getElementById("np_qty").value)||0;
   const sku=document.getElementById("np_sku").value.trim();
   if(editProdId){
-    products=products.map(p=>p.id===editProdId?{...p,barcode,name,sku,location:loc,qty}:p);
-    editProdId=null;showToast("Produto atualizado!");
+    const finalQty = formLocs.length > 0 ? locQty : qty;
+    const finalLocs = formLocs.length > 0 ? formLocs : (loc ? [{location:loc, qty:finalQty}] : []);
+    products=products.map(p=>p.id===editProdId?{...p,barcode,name,sku,location:loc,locations:finalLocs,qty:finalQty}:p);
+    editProdId=null; formLocs_arr=[];
+    showToast("Produto atualizado!");
     document.getElementById("addProdTitle").textContent="➕ Adicionar Produto Manualmente";
     document.getElementById("cancelEditBtn").style.display="none";
   } else {
-    products.push({id:"p"+Date.now(),barcode,name,sku,location:loc,qty});
+    products.push({id:"p"+Date.now(),barcode,name,sku,location:loc,locations:loc?[{location:loc,qty}]:[],qty});
     addLog("estoque", `Produto cadastrado: ${name}`, `Barcode: ${barcode} · Qtd: ${qty}`);
     showToast("Produto adicionado!");
   }
   document.getElementById("np_barcode").value="";document.getElementById("np_name").value="";
   document.getElementById("np_sku").value="";document.getElementById("np_location_sel").value="";document.getElementById("np_qty").value="0";
+  formLocs_arr=[];
+  if(typeof cloudSaveAll==="function") cloudSaveAll();
   renderAll();
 }
 
@@ -2197,6 +2202,7 @@ function saveUser(){
   document.getElementById("uf_user").value="";
   document.getElementById("uf_pass").value="";
   document.getElementById("uf_role").value="expedicao";
+  if(typeof cloudSaveAll==="function") cloudSaveAll();
   renderUserList();
 }
 
@@ -2233,6 +2239,7 @@ function deleteUser(id){
   if(!confirm(`Remover ${u.name}?`)) return;
   USERS = USERS.filter(x=>x.id!==id);
   showToast("Colaborador removido.");
+  if(typeof cloudSaveAll==="function") cloudSaveAll();
   renderUserList();
 }
 
