@@ -1078,6 +1078,7 @@ function finishPrepare(id, name, fromLocation){
   });
 
   orders = orders.map(o=>o.id===id?{...o,status:"preparado",preparedAt:new Date().toISOString(),preparedBy:name,fromLocation:fromLocation||""}:o);
+  if(typeof cloudSaveAll==="function") cloudSaveAll();
   alertDismissed = false;
   const locMsg = fromLocation ? ` (retirado de ${fromLocation})` : "";
   const ord2 = orders.find(o=>o.id===id);
@@ -1091,6 +1092,7 @@ function markSent(id){
   const ord = orders.find(o=>o.id===id);
   addLog("expedicao", `Pedido ${ord?.orderId||id} enviado`, `${ord?.productName||""} · ${ord?.marketplace||""}`);
   orders=orders.map(o=>o.id===id?{...o,status:"enviado"}:o);
+  if(typeof cloudSaveAll==="function") cloudSaveAll();
   showToast("📤 Marcado como enviado!");
   renderAll();
 }
@@ -1803,6 +1805,7 @@ function confirmEntry(){
   importedItems=[];importSource=null;
   document.getElementById("importOptions").style.display="";
   document.getElementById("reviewCard").style.display="none";
+  if(typeof cloudSaveAll==="function") cloudSaveAll();
   renderAll();
 }
 
@@ -2158,6 +2161,7 @@ function confirmRetirada(){
 
   const detail = `${qty} un. ${location?"de "+location:""} · Motivo: ${reason}${obs?" · "+obs:""}`;
   addLog("retirada", `Retirada de "${retSelectedProduct.name}"`, detail);
+  if(typeof cloudSaveAll==="function") cloudSaveAll();
   showToast(`📤 ${qty} un. retirada(s) do estoque.`);
   closeRetirada();
   renderAll();
@@ -2390,6 +2394,7 @@ function addRegion(){
   const parentId = document.getElementById("reg_parent").value||null;
   const desc = document.getElementById("reg_desc").value.trim();
   regions.push({id:"r"+Date.now(), name, parentId, desc});
+  if(typeof cloudSaveAll==="function") cloudSaveAll();
   document.getElementById("reg_name").value="";
   document.getElementById("reg_desc").value="";
   showToast("Região adicionada!");
@@ -2507,6 +2512,7 @@ function clearRegionMapping(regionName){
   regions = regions.map(r=>r.name===regionName?{...r,status:"ativa"}:r);
 
   if(typeof cloudSaveAll==="function") cloudSaveAll();
+  if(typeof cloudSaveAll==="function") cloudSaveAll();
   showToast(`✅ Mapeamento da ${regionName} limpo! ${prods.length} produto(s) sem localização.`);
   renderAll();
 }
@@ -2515,6 +2521,7 @@ function setRegionStatus(id, status){
   regions = regions.map(r=>r.id===id?{...r,status}:r);
   const r = regions.find(x=>x.id===id);
   const msgs = {mapeando:`🔄 "${r.name}" em mapeamento!`, finalizada:`✅ "${r.name}" finalizada! Expedição liberada.`, ativa:`↩ "${r.name}" reaberta.`};
+  if(typeof cloudSaveAll==="function") cloudSaveAll();
   showToast(msgs[status]||"Status atualizado.");
   if(status==="finalizada") addLog("estoque", `Área finalizada: ${r.name}`, `Mapeamento concluído`);
   renderRegions();
