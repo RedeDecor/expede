@@ -1714,7 +1714,10 @@ function renderImportReview(){
 function setItemAction(id,action){
   importedItems=importedItems.map(i=>i.id===id?{...i,action,matchedProduct:action==="create"?null:i.matchedProduct}:i);
   renderImportReview();
-  if(action==="link") setTimeout(()=>{ const inp=document.getElementById("linkSearch_"+id); if(inp)inp.focus(); },80);
+  setTimeout(()=>{
+    const inp=document.getElementById("linkSearch_"+id);
+    if(inp){ inp.focus(); inp.scrollIntoView({behavior:"smooth",block:"center"}); }
+  }, 150);
 }
 
 function unlinkItem(id){
