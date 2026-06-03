@@ -1694,7 +1694,13 @@ function renderImportReview(){
     }
 
     return `<tr style="background:${i%2?"#161618":"transparent"}">
-      <td style="font-weight:500">${item.name}<div style="font-size:11px;color:#888;font-family:'Courier New',monospace">SKU nota: ${item.sku||"—"} · EAN: ${item.barcode||"—"}</div></td>
+      <td style="font-weight:500">
+        <input type="text" value="${item.name}" style="width:100%;padding:5px 8px;font-size:13px;background:#252528;border:1px solid #3A3A3E;border-radius:7px;color:#F0F0F0;font-family:inherit;font-weight:600;margin-bottom:4px" onchange="importedItems=importedItems.map(i=>i.id==='${item.id}'?{...i,name:this.value}:i)" placeholder="Nome do produto">
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <input type="text" value="${item.sku||""}" style="width:50%;padding:4px 8px;font-size:11px;background:#1A1A1D;border:1px solid #2A2A2E;border-radius:6px;color:#888;font-family:'Courier New',monospace" onchange="importedItems=importedItems.map(i=>i.id==='${item.id}'?{...i,sku:this.value}:i)" placeholder="SKU">
+          <span style="font-size:11px;color:#666;align-self:center">EAN: ${item.barcode||"—"}</span>
+        </div>
+      </td>
       <td style="text-align:center;font-weight:700;font-size:15px">${item.qty}</td>
       <td>${matchCell}</td>
       <td><input id="loc_${item.id}" value="${item.location||""}" placeholder="Definir depois" style="padding:5px 10px;font-size:12px;width:130px;background:#252528;border:1px solid #3A3A3E;border-radius:9px;color:#F0F0F0;font-family:inherit" onchange="updateImportLoc('${item.id}',this.value)"></td>
