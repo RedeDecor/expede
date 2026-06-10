@@ -151,6 +151,7 @@ thead tr{border-bottom:1px solid #2A2A2E}
 .logout-menu button:hover{background:#252528}
 
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -405,8 +406,11 @@ thead tr{border-bottom:1px solid #2A2A2E}
     <div id="regStatusSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px"></div>
 
     <div class="card">
-      <div class="stitle" id="regListTitle">📍 Regiões Cadastradas</div>
-      <div id="regTree" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:0;flex-wrap:wrap">
+        <div class="stitle" style="margin:0" id="regListTitle">📍 Regiões Cadastradas</div>
+        <button class="btn btn-secondary" style="margin-left:auto;font-size:12px;padding:8px 14px" onclick="openQRModal()">📱 Gerar QR Codes</button>
+      </div>
+      <div id="regTree" style="display:flex;flex-direction:column;gap:8px;margin-top:14px"></div>
     </div>
 
   </div>
@@ -652,6 +656,26 @@ thead tr{border-bottom:1px solid #2A2A2E}
         <button class="btn btn-danger" style="flex:1;font-size:14px;padding:13px" onclick="confirmRetirada()">📤 Confirmar Retirada</button>
       </div>
     </div>
+  </div>
+</div>
+
+
+<!-- ═══ QR CODES DAS REGIÕES ══════════════════════════════════════════ -->
+<div id="qrModal" class="modal-bg" style="display:none">
+  <div class="card" style="max-width:680px;width:96%;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div class="stitle" style="margin:0">📱 QR Codes das Regiões</div>
+      <button class="btn btn-secondary" style="margin-left:auto;padding:8px 14px;font-size:12px" onclick="window.print()">🖨️ Imprimir</button>
+      <button class="btn btn-secondary" style="padding:8px 14px;font-size:12px" onclick="document.getElementById('qrModal').style.display='none'">✕ Fechar</button>
+    </div>
+    <p style="font-size:12px;color:#888;margin-bottom:16px">Cole cada QR code na região correspondente. No Mapeamento Rápido, bipe o QR code para selecionar a região automaticamente!</p>
+    <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="text" id="qrFilter" placeholder="Filtrar regiões..." style="max-width:200px;font-size:13px" oninput="renderQRCodes()">
+      <label style="font-size:13px;color:#888;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="qrOnlyMapped" onchange="renderQRCodes()"> Só regiões com produtos
+      </label>
+    </div>
+    <div id="qrGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px"></div>
   </div>
 </div>
 
@@ -2167,6 +2191,74 @@ function confirmRetirada(){
   renderAll();
 }
 
+
+// ── QR Codes das Regiões ──────────────────────────────────────────────────────
+const QR_PREFIX = "EXPEDE_REGION:";
+
+function openQRModal(){
+  document.getElementById("qrModal").style.display="flex";
+  document.getElementById("qrFilter").value="";
+  document.getElementById("qrOnlyMapped").checked=false;
+  setTimeout(renderQRCodes, 100);
+}
+
+function renderQRCodes(){
+  const q = norm(document.getElementById("qrFilter")?.value||"");
+  const onlyMapped = document.getElementById("qrOnlyMapped")?.checked;
+  const grid = document.getElementById("qrGrid");
+  if(!grid) return;
+
+  let regs = regions.filter(r=>{
+    if(q && !norm(r.name).includes(q)) return false;
+    if(onlyMapped && !products.some(p=>getLocationNames(p).includes(r.name))) return false;
+    return true;
+  });
+
+  grid.innerHTML = regs.map(r=>`
+    <div id="qrcard_${r.id}" style="background:#1A1A1D;border-radius:10px;padding:12px;text-align:center;border:1px solid #2A2A2E">
+      <div id="qr_${r.id}" style="display:flex;justify-content:center;margin-bottom:8px"></div>
+      <div style="font-size:12px;font-weight:700;color:#F0F0F0;line-height:1.3">${r.name}</div>
+      <div style="font-size:10px;color:#666;margin-top:3px">${products.filter(p=>getLocationNames(p).includes(r.name)).length} produto(s)</div>
+    </div>`).join("");
+
+  // Generate QR codes
+  regs.forEach(r=>{
+    const el = document.getElementById("qr_"+r.id);
+    if(!el) return;
+    el.innerHTML = "";
+    try {
+      new QRCode(el, {
+        text: QR_PREFIX + r.name,
+        width: 120,
+        height: 120,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    } catch(e){ el.innerHTML = `<div style="color:#666;font-size:11px">QR indisponível</div>`; }
+  });
+}
+
+// ── Detectar QR de região no mapeamento ──────────────────────────────────────
+function handleMapScanInput(val){
+  if(val.startsWith(QR_PREFIX)){
+    // É um QR code de região!
+    const regionName = val.replace(QR_PREFIX,"").trim();
+    const region = regions.find(r=>r.name===regionName);
+    if(region){
+      const sel = document.getElementById("mapRegionSelect");
+      if(sel){
+        sel.value = regionName;
+        sel.dispatchEvent(new Event("change"));
+      }
+      document.getElementById("mapScanInput").value="";
+      showToast(`📍 Região selecionada: ${regionName}`);
+      return true; // consumed
+    }
+  }
+  return false; // not a region QR
+}
+
 // ── gestão de usuários ────────────────────────────────────────────────────────
 let editUserId = null;
 let showPass = false;
@@ -2585,6 +2677,8 @@ function updateMapRegion(){
 
 function mapScan(val){
   const barcode = val.trim();
+  // Check if it's a region QR code
+  if(handleMapScanInput(barcode)) return;
   const region = document.getElementById("mapRegionSelect").value;
   document.getElementById("mapScanInput").value = "";
   if(!barcode || !region) return;
@@ -2856,8 +2950,12 @@ function undoMapScan(logId){
 
 function exportRegionCSV(){
   const activeFilter = document.getElementById("mapRegionFilter")?.value||"";
-  
-  // build region map
+
+  if(!activeFilter){
+    showToast("Selecione uma região no filtro antes de exportar.","err");
+    return;
+  }
+
   const byRegion = {};
   products.forEach(p=>{
     const locs = getLocations(p);
@@ -2869,25 +2967,20 @@ function exportRegionCSV(){
     });
   });
 
-  const regionKeys = activeFilter ? [activeFilter] : Object.keys(byRegion).sort();
-  if(!regionKeys.length || !byRegion[regionKeys[0]]){
-    showToast("Selecione uma região para exportar.","err"); return;
-  }
+  const prods = (byRegion[activeFilter]||[]).sort((a,b)=>a.name.localeCompare(b.name,"pt-BR"));
+  if(!prods.length){ showToast("Nenhum produto nessa região.","err"); return; }
 
-  let csv = "Regiao;Produto;SKU;EAN;Qtd na Regiao;Qtd Total Estoque\n";
-  regionKeys.forEach(r=>{
-    (byRegion[r]||[]).forEach(p=>{
-      csv += `${r};${p.name};${p.sku};${p.barcode};${p.qty};${p.totalQty}
-`;
-    });
+  let csv = "Regiao;Produto;SKU;EAN;Quantidade\n";
+  prods.forEach(p=>{
+    csv += activeFilter+";"+p.name+";"+p.sku+";"+p.barcode+";"+p.qty+"\n";
   });
 
-  const fname = activeFilter ? `regiao_${activeFilter.replace(/[^a-zA-Z0-9]/g,"_")}.csv` : `todas_regioes_${new Date().toISOString().slice(0,10)}.csv`;
+  const fname = "regiao_"+activeFilter.replace(/[^a-zA-Z0-9]/g,"_")+".csv";
   const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a"); a.href=url; a.download=fname; a.click();
   URL.revokeObjectURL(url);
-  showToast(`📤 Exportado: ${fname}`);
+  showToast("📤 Exportado: "+fname);
 }
 
 function clearMapLog(){
