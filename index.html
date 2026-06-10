@@ -2956,18 +2956,15 @@ function exportRegionCSV(){
     return;
   }
 
-  const byRegion = {};
+  const prods = [];
   products.forEach(p=>{
     const locs = getLocations(p);
-    locs.forEach(l=>{
-      if(!l.location) return;
-      if(!byRegion[l.location]) byRegion[l.location]=[];
-      if(!byRegion[l.location].find(x=>x.barcode===p.barcode))
-        byRegion[l.location].push({barcode:p.barcode, name:p.name, sku:p.sku, qty:l.qty, totalQty:getTotalQty(p)});
-    });
+    const locInRegion = locs.find(l=>l.location===activeFilter);
+    if(locInRegion){
+      prods.push({barcode:p.barcode, name:p.name, sku:p.sku, qty:locInRegion.qty});
+    }
   });
-
-  const prods = (byRegion[activeFilter]||[]).sort((a,b)=>a.name.localeCompare(b.name,"pt-BR"));
+  prods.sort((a,b)=>a.name.localeCompare(b.name,"pt-BR"));
   if(!prods.length){ showToast("Nenhum produto nessa região.","err"); return; }
 
   let csv = "Regiao;Produto;SKU;EAN;Quantidade\n";
