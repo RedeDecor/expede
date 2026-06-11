@@ -2875,14 +2875,34 @@ function toggleMapRegion(region){
 }
 
 function exportRegionCSV(region){
-  const prods = products.filter(p=>p.location===region);
-  if(!prods.length) return;
-  const h = "Nome;SKU;Código de Barras;Quantidade;Localização\n";
-  const rows = prods.map(p=>`${p.name};${p.sku};${p.barcode};${p.qty};${p.location}`).join("\n");
-  const blob = new Blob([h+rows],{type:"text/csv;charset=utf-8;"});
+  // If called with a region parameter, use it; otherwise use the filter dropdown
+  const activeRegion = region || document.getElementById("mapRegionFilter")?.value||"";
+  if(!activeRegion){ showToast("Selecione uma região para exportar.","err"); return; }
+
+  const prods = [];
+  const seen = new Set();
+  products.forEach(p=>{
+    if(seen.has(p.id)) return;
+    const locs = getLocations(p);
+    const locInRegion = locs.find(l=>l.location===activeRegion);
+    if(locInRegion){
+      seen.add(p.id);
+      prods.push({barcode:p.barcode||"", name:p.name||"", sku:p.sku||"", qty:locInRegion.qty});
+    }
+  });
+  prods.sort((a,b)=>a.name.localeCompare(b.name,"pt-BR"));
+  if(!prods.length){ showToast("Nenhum produto nessa região.","err"); return; }
+
+  const lines = ["Nome;SKU;Código de Barras;Quantidade;Localização"];
+  prods.forEach(p=>{ lines.push([p.name, p.sku, p.barcode, p.qty, activeRegion].join(";")); });
+  const csv = "\uFEFF" + lines.join("\n");
+
+  const fname = "regiao_"+activeRegion.replace(/[^a-zA-Z0-9]/g,"_")+".csv";
+  const blob = new Blob([csv],{type:"text/csv;charset=utf-8;"});
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href=url; a.download=`region_${region}.csv`; a.click();
+  const a = document.createElement("a"); a.href=url; a.download=fname; a.click();
   URL.revokeObjectURL(url);
+  showToast("📤 "+fname+" ("+prods.length+" produtos)");
 }
 
 
@@ -2947,38 +2967,6 @@ function undoMapScan(logId){
   setTimeout(()=>{ const inp=document.getElementById("mapScanInput"); if(inp&&!inp.disabled) inp.focus(); },50);
 }
 
-
-function exportRegionCSV(){
-  const activeFilter = document.getElementById("mapRegionFilter")?.value||"";
-
-  if(!activeFilter){
-    showToast("Selecione uma região no filtro antes de exportar.","err");
-    return;
-  }
-
-  const prods = [];
-  products.forEach(p=>{
-    const locs = getLocations(p);
-    const locInRegion = locs.find(l=>l.location===activeFilter);
-    if(locInRegion){
-      prods.push({barcode:p.barcode, name:p.name, sku:p.sku, qty:locInRegion.qty});
-    }
-  });
-  prods.sort((a,b)=>a.name.localeCompare(b.name,"pt-BR"));
-  if(!prods.length){ showToast("Nenhum produto nessa região.","err"); return; }
-
-  let csv = "Regiao;Produto;SKU;EAN;Quantidade\n";
-  prods.forEach(p=>{
-    csv += activeFilter+";"+p.name+";"+p.sku+";"+p.barcode+";"+p.qty+"\n";
-  });
-
-  const fname = "regiao_"+activeFilter.replace(/[^a-zA-Z0-9]/g,"_")+".csv";
-  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href=url; a.download=fname; a.click();
-  URL.revokeObjectURL(url);
-  showToast("📤 Exportado: "+fname);
-}
 
 function clearMapLog(){
   if(!mapLog.length) return;
