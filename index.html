@@ -755,7 +755,7 @@ thead tr{border-bottom:1px solid #2A2A2E}
         ]);
 
         // Only replace local data if cloud has data (never overwrite with empty)
-        if(cloudProducts && cloudProducts.length > 0)  products    = cloudProducts;
+        if(cloudProducts && cloudProducts.length > 0)  products    = cloudProducts.map(normalizeProduct);
         if(cloudOrders   && cloudOrders.length   > 0)  orders      = cloudOrders;
         if(cloudRegions  && cloudRegions.length  > 0)  regions     = cloudRegions;
         if(cloudUsers    && cloudUsers.length    > 0)  USERS       = cloudUsers;
@@ -841,9 +841,19 @@ function norm(s){return (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-
 function getLocations(p){
   // returns [{location, qty}] array
   if(p.locations && p.locations.length) return p.locations;
-  // backward compat: single location field
+  // backward compat: single location field — qty per location is unknown
+  // use qty only if there's a single location (all stock is there)
   if(p.location) return [{location:p.location, qty:p.qty||0}];
   return [{location:"", qty:p.qty||0}];
+}
+
+// Normalize a product to have locations array — call after loading from Firebase
+function normalizeProduct(p){
+  if(p.locations && p.locations.length) return p;
+  if(p.location){
+    return {...p, locations:[{location:p.location, qty:p.qty||0}]};
+  }
+  return {...p, locations:[{location:"", qty:p.qty||0}]};
 }
 
 function getTotalQty(p){
