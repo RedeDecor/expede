@@ -2809,39 +2809,51 @@ function renderMapLog(){
 let selectedMapRegion = null;
 
 function renderMapSummary(){
-  // build by-region from log AND from all products with a location
   const byRegion = {};
-  // include all products that have a location
-  products.filter(p=>p.location).forEach(p=>{
-    if(!byRegion[p.location]) byRegion[p.location]=[];
-    if(!byRegion[p.location].find(x=>x.id===p.id)) byRegion[p.location].push(p);
+  // build from getLocations for correct qty per region
+  products.forEach(p=>{
+    const locs = getLocations(p);
+    locs.forEach(l=>{
+      if(!l.location) return;
+      if(!byRegion[l.location]) byRegion[l.location]=[];
+      if(!byRegion[l.location].find(x=>x.id===p.id))
+        byRegion[l.location].push({...p, regionQty: l.qty});
+    });
   });
 
   const el = document.getElementById("mapSummary");
   const regionKeys = Object.keys(byRegion).sort();
   if(!regionKeys.length){ el.innerHTML = "<div style='color:#666;font-size:13px'>Nenhum produto mapeado ainda.</div>"; return; }
 
-  el.innerHTML = regionKeys.map(r => {
+  // store regions in a lookup for export
+  window._mapByRegion = byRegion;
+
+  el.innerHTML = regionKeys.map((r,ri) => {
     const prods = byRegion[r];
+    const totalUnits = prods.reduce((s,p)=>s+p.regionQty,0);
     const isOpen = selectedMapRegion === r;
+    const rid = "mapregion_"+ri;
     return `
     <div style="border-radius:9px;overflow:hidden;border:1px solid ${isOpen?"#E85D04":"#2A2A2E"}">
-      <div onclick="toggleMapRegion('${r}')" style="display:flex;align-items:center;gap:12px;background:${isOpen?"#2B1400":"#252528"};padding:12px 14px;cursor:pointer;transition:background .15s">
+      <div onclick="toggleMapRegion('${r.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:12px;background:${isOpen?"#2B1400":"#252528"};padding:12px 14px;cursor:pointer">
         <span style="background:#E85D04;color:#fff;padding:4px 14px;border-radius:6px;font-family:'Courier New',monospace;font-weight:700;font-size:14px">${r}</span>
         <div style="flex:1;font-size:13px;color:#888">${prods.slice(0,3).map(p=>p.name).join(" · ")}${prods.length>3?" <span style='color:#E85D04'>+mais "+(prods.length-3)+"</span>":""}</div>
-        <span style="font-weight:700;color:#22C55E;white-space:nowrap">${prods.length} produto(s)</span>
+        <span style="font-weight:700;color:#22C55E;white-space:nowrap">${totalUnits} un. · ${prods.length} tipo(s)</span>
         <span style="color:#E85D04;font-size:16px">${isOpen?"▲":"▼"}</span>
       </div>
       ${isOpen ? `
       <div style="background:#1A1A1D;border-top:1px solid #2A2A2E">
         <div style="padding:8px 14px;border-bottom:1px solid #2A2A2E">
-          <input type="text" id="regionFilter_${r}" placeholder="Filtrar por nome ou SKU..." oninput="filterRegionProds('${r}',this.value)" style="padding:7px 12px;font-size:13px;background:#252528;border:1px solid #3A3A3E;border-radius:8px;color:#F0F0F0;font-family:inherit;width:100%">
+          <input type="text" placeholder="Filtrar por nome ou SKU..." oninput="filterRegionProds('${r.replace(/'/g,"\\'")}',this.value)" style="padding:7px 12px;font-size:13px;background:#252528;border:1px solid #3A3A3E;border-radius:8px;color:#F0F0F0;font-family:inherit;width:100%">
         </div>
-        <div id="regionProdList_${r}" style="display:flex;flex-direction:column">
-          ${renderRegionProdRows(prods, r)}
+        <div id="regionProdList_${ri}" style="display:flex;flex-direction:column">
+          ${prods.map((p,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:${i%2?"#252528":"transparent"};font-size:13px">
+            <div style="flex:1"><div style="font-weight:600">${p.name}</div><div style="font-size:11px;color:#888">SKU: ${p.sku} · EAN: ${p.barcode||"—"}</div></div>
+            <span style="color:#22C55E;font-weight:700;white-space:nowrap">${p.regionQty} un.</span>
+          </div>`).join("")}
         </div>
         <div style="padding:10px 14px;border-top:1px solid #2A2A2E;display:flex;gap:8px">
-          <button class="btn btn-ghost" style="font-size:12px;padding:6px 14px" onclick="exportRegionCSV('${r}')">📤 Exportar lista</button>
+          <button class="btn btn-ghost" style="font-size:12px;padding:6px 14px" onclick="exportRegionCSV('${r.replace(/'/g,"\\'")}')">📤 Exportar lista</button>
         </div>
       </div>` : ""}
     </div>`;
