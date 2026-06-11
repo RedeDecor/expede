@@ -2905,8 +2905,8 @@ function exportRegionCSV(region){
   prods.sort((a,b)=>a.name.localeCompare(b.name,"pt-BR"));
   if(!prods.length){ showToast("Nenhum produto nessa região.","err"); return; }
 
-  const lines = ["Nome;SKU;Código de Barras;Quantidade;Localização"];
-  prods.forEach(p=>{ lines.push([p.name, p.sku, p.barcode, p.qty, activeRegion].join(";")); });
+  const lines = ["Nome;SKU;Código de Barras;Qtd na Região;Estoque Total;Localização"];
+  prods.forEach(p=>{ lines.push([p.name, p.sku, p.barcode, p.regionQty, getTotalQty(p), activeRegion].join(";")); });
   const csv = "\uFEFF" + lines.join("\n");
 
   const fname = "regiao_"+activeRegion.replace(/[^a-zA-Z0-9]/g,"_")+".csv";
