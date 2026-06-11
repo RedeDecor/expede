@@ -2876,9 +2876,28 @@ function renderRegionProdRows(prods, region){
 
 function filterRegionProds(region, query){
   const q = norm(query);
-  const prods = products.filter(p=>p.location===region && (!q || norm(p.name).includes(q) || norm(p.sku).includes(q)));
-  const el = document.getElementById("regionProdList_"+region);
-  if(el) el.innerHTML = renderRegionProdRows(prods, region);
+  const byRegion = {};
+  products.forEach(p=>{
+    const locs = getLocations(p);
+    locs.forEach(l=>{
+      if(!l.location) return;
+      if(!byRegion[l.location]) byRegion[l.location]=[];
+      if(!byRegion[l.location].find(x=>x.id===p.id))
+        byRegion[l.location].push({...p, regionQty: l.qty});
+    });
+  });
+  const allProds = byRegion[region]||[];
+  const filtered = allProds.filter(p=>!q || norm(p.name).includes(q) || norm(p.sku||"").includes(q));
+
+  // find the right element - use region keys to get index
+  const regionKeys = Object.keys(byRegion).sort();
+  const ri = regionKeys.indexOf(region);
+  const el = document.getElementById("regionProdList_"+ri);
+  if(el) el.innerHTML = filtered.map((p,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:${i%2?"#252528":"transparent"};font-size:13px">
+      <div style="flex:1"><div style="font-weight:600">${p.name}</div><div style="font-size:11px;color:#888">SKU: ${p.sku||"—"} · EAN: ${p.barcode||"—"}</div></div>
+      <span style="color:#22C55E;font-weight:700;white-space:nowrap">${p.regionQty} un.</span>
+    </div>`).join("");
 }
 
 function toggleMapRegion(region){
