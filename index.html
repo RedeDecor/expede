@@ -2705,18 +2705,22 @@ function mapScan(val){
       if(zeroStock) showToast(`⚠️ ATENÇÃO: ${prod.name} está com estoque ZERO!`, "err");
       else showToast(`📍 ${prod.name} já está em ${region}`);
     } else {
-      // nova localização — move unidades de "Sem local" para cá, NÃO soma
+      // nova localização — move apenas 1 unidade para cá, restante fica "Sem local"
       const semLocal = locs.find(l=>!l.location||l.location==="");
       let newLocs;
       if(locs.length === 0 || (locs.length === 1 && (!locs[0].location||locs[0].location===""))){
-        // sem localização — move tudo para esta região
-        newLocs = [{location:region, qty:totalQty}];
+        // sem localização — move 1 unidade para esta região, restante fica sem local
+        const remaining = totalQty - 1;
+        newLocs = [{location:region, qty:1}];
+        if(remaining > 0) newLocs.push({location:"", qty:remaining});
       } else if(semLocal){
-        // tem "Sem local" — move essas unidades para esta região
-        newLocs = locs.filter(l=>l.location&&l.location!=="").concat([{location:region, qty:semLocal.qty}]);
+        // tem "Sem local" — move 1 unidade de lá para esta região
+        const remaining = semLocal.qty - 1;
+        newLocs = locs.filter(l=>l.location&&l.location!=="").concat([{location:region, qty:1}]);
+        if(remaining > 0) newLocs.push({location:"", qty:remaining});
       } else {
-        // já tem outras localizações — registra sem quantidade (distribuir depois)
-        newLocs = [...locs, {location:region, qty:0}];
+        // já tem outras localizações — registra com 1 unidade
+        newLocs = [...locs, {location:region, qty:1}];
       }
       const newTotal = newLocs.reduce((s,l)=>s+l.qty, 0);
       products = products.map(p => p.barcode === barcode
@@ -2724,7 +2728,7 @@ function mapScan(val){
         : p);
       mapLog.unshift({id:"ml"+Date.now(), barcode, name:prod.name, region, oldLoc, found:true, ts, increment:false, zeroStock});
       if(zeroStock) showToast(`⚠️ ATENÇÃO: ${prod.name} está com estoque ZERO!`, "err");
-      else showToast(`📍 ${prod.name} → ${region}`);
+      else showToast(`📍 ${prod.name} → ${region} (1 un.)`);
     }
     if(typeof cloudSaveAll==="function") cloudSaveAll();
   } else {
@@ -2918,14 +2922,14 @@ function exportRegionCSV(region){
     const locInRegion = locs.find(l=>l.location===activeRegion);
     if(locInRegion){
       seen.add(p.id);
-      prods.push({barcode:p.barcode||"", name:p.name||"", sku:p.sku||"", qty:locInRegion.qty});
+      prods.push({barcode:p.barcode||"", name:p.name||"", sku:p.sku||"", regionQty:locInRegion.qty, totalQty:getTotalQty(p)});
     }
   });
   prods.sort((a,b)=>a.name.localeCompare(b.name,"pt-BR"));
   if(!prods.length){ showToast("Nenhum produto nessa região.","err"); return; }
 
   const lines = ["Nome;SKU;Código de Barras;Qtd na Região;Estoque Total;Localização"];
-  prods.forEach(p=>{ lines.push([p.name, p.sku, p.barcode, p.regionQty, getTotalQty(p), activeRegion].join(";")); });
+  prods.forEach(p=>{ lines.push([p.name, p.sku, p.barcode, p.regionQty, p.totalQty, activeRegion].join(";")); });
   const csv = "\uFEFF" + lines.join("\n");
 
   const fname = "regiao_"+activeRegion.replace(/[^a-zA-Z0-9]/g,"_")+".csv";
