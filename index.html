@@ -737,6 +737,12 @@ thead tr{border-bottom:1px solid #2A2A2E}
     }
 
     // ── init: load all data from cloud ────────────────────────────────
+    function normalizeProduct(p){
+      if(p.locations && p.locations.length) return p;
+      if(p.location) return {...p, locations:[{location:p.location, qty:p.qty||0}]};
+      return {...p, locations:[{location:"", qty:p.qty||0}]};
+    }
+
     async function initFromCloud(){
       const indicator = document.getElementById("cloudIndicator");
       if(indicator){ indicator.textContent = "☁️ Carregando..."; indicator.style.color="#F59E0B"; }
@@ -847,14 +853,7 @@ function getLocations(p){
   return [{location:"", qty:p.qty||0}];
 }
 
-// Normalize a product to have locations array — call after loading from Firebase
-function normalizeProduct(p){
-  if(p.locations && p.locations.length) return p;
-  if(p.location){
-    return {...p, locations:[{location:p.location, qty:p.qty||0}]};
-  }
-  return {...p, locations:[{location:"", qty:p.qty||0}]};
-}
+
 
 function getTotalQty(p){
   return getLocations(p).reduce((s,l)=>s+l.qty,0);
@@ -2693,6 +2692,7 @@ function mapScan(val){
   document.getElementById("mapScanInput").value = "";
   if(!barcode || !region) return;
 
+  // Always get fresh product from current products array
   const prod = products.find(p => p.barcode === barcode);
   const ts = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
 
@@ -2704,16 +2704,24 @@ function mapScan(val){
 
   if(prod){
     const oldLoc = prod.location;
-    const locs = getLocations(prod);
+    // Always normalize to get fresh locations array
+    const normalProd = normalizeProduct(prod);
+    const locs = getLocations(normalProd);
     const existingLoc = locs.find(l=>l.location===region);
-    const totalQty = getTotalQty(prod);
+    console.log("mapScan debug:", prod.name, "region:", region, "locs:", JSON.stringify(locs), "existingLoc:", existingLoc);
+    const totalQty = getTotalQty(normalProd);
     const zeroStock = totalQty <= 0;
 
     if(existingLoc){
-      // já mapeado aqui — só registra no log, NÃO altera quantidade
+      // já mapeado aqui — incrementa +1 na quantidade desta região
+      const newLocs = locs.map(l=>l.location===region ? {...l, qty:l.qty+1} : l);
+      const newTotal = newLocs.reduce((s,l)=>s+l.qty,0);
+      products = products.map(p => p.barcode === barcode
+        ? {...p, locations:newLocs, qty:newTotal}
+        : p);
       mapLog.unshift({id:"ml"+Date.now(), barcode, name:prod.name, region, oldLoc, found:true, ts, increment:true, zeroStock});
       if(zeroStock) showToast(`⚠️ ATENÇÃO: ${prod.name} está com estoque ZERO!`, "err");
-      else showToast(`📍 ${prod.name} já está em ${region}`);
+      else showToast(`📍 ${prod.name} → ${region} (+1 un.)`);
     } else {
       // nova localização — move apenas 1 unidade para cá, restante fica "Sem local"
       const semLocal = locs.find(l=>!l.location||l.location==="");
@@ -2852,7 +2860,8 @@ function renderMapSummary(){
       <div onclick="toggleMapRegion('${r.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:12px;background:${isOpen?"#2B1400":"#252528"};padding:12px 14px;cursor:pointer">
         <span style="background:#E85D04;color:#fff;padding:4px 14px;border-radius:6px;font-family:'Courier New',monospace;font-weight:700;font-size:14px">${r}</span>
         <div style="flex:1;font-size:13px;color:#888">${prods.slice(0,3).map(p=>p.name).join(" · ")}${prods.length>3?" <span style='color:#E85D04'>+mais "+(prods.length-3)+"</span>":""}</div>
-        <span style="font-weight:700;color:#22C55E;white-space:nowrap">${totalUnits} un. · ${prods.length} tipo(s)</span>
+        <span style="font-weight:700;color:#22C55E;white-space:nowrap">${totalUnits} un.</span>
+        <span style="color:#888;font-size:12px;white-space:nowrap">${prods.length} tipo(s)</span>
         <span style="color:#E85D04;font-size:16px">${isOpen?"▲":"▼"}</span>
       </div>
       ${isOpen ? `
