@@ -784,7 +784,9 @@ thead tr{border-bottom:1px solid #2A2A2E}
     function cloudSaveAll(){
       if(!cloudReady) return; // never save before loading
       // only save non-empty collections to prevent accidental overwrites
-      if(products.length > 0)     saveToCloud("products", products);
+      // require at least 10 products to save (prevents saving empty state)
+      if(products.length > 10)    saveToCloud("products", products);
+      else if(products.length > 0) console.warn("Blocked saving only", products.length, "products — too few, likely not loaded yet");
       if(orders.length > 0)       saveToCloud("orders", orders);
       if(regions.length > 0)      saveToCloud("regions", regions);
       if(USERS.length > 0)        saveToCloud("users", USERS);
