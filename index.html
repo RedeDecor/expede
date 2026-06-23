@@ -1751,10 +1751,21 @@ function renderImportReview(){
 function setItemAction(id,action){
   importedItems=importedItems.map(i=>i.id===id?{...i,action,matchedProduct:action==="create"?null:i.matchedProduct}:i);
   renderImportReview();
-  setTimeout(()=>{
-    const inp=document.getElementById("linkSearch_"+id);
-    if(inp){ inp.focus(); inp.scrollIntoView({behavior:"smooth",block:"center"}); }
-  }, 150);
+  if(action==="link"){
+    // try multiple times to find and focus the search field
+    let attempts = 0;
+    const tryFocus = ()=>{
+      attempts++;
+      const inp=document.getElementById("linkSearch_"+id);
+      if(inp){
+        inp.focus();
+        inp.scrollIntoView({behavior:"smooth",block:"center"});
+      } else if(attempts < 10){
+        setTimeout(tryFocus, 100);
+      }
+    };
+    setTimeout(tryFocus, 100);
+  }
 }
 
 function unlinkItem(id){
